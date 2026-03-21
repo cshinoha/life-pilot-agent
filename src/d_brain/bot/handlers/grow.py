@@ -31,6 +31,7 @@ from d_brain.services.grow import (
     analyze_answers,
     delete_draft,
     ensure_yearly_goals_file,
+    find_latest_draft,
     finalize_reflection,
     get_period_for_session,
     is_reflection_done,
@@ -208,10 +209,10 @@ async def start_grow_session(
 async def _finalize_session(bot: Bot, chat_id: int, state: FSMContext) -> None:
     """Analyze answers, show summary, ask for confirmation."""
     data = await state.get_data()
-    session_type: str = data["session_type"]
-    period: str = data["period"]
-    questions: list[dict] = data["questions"]
-    answers: dict = data["answers"]
+    session_type: str = data.get("session_type", "weekly")
+    period: str = data.get("period", get_period_for_session(session_type))
+    questions: list[dict] = data.get("questions", [])
+    answers: dict = data.get("answers", {})
     settings = get_settings()
     vault_path = settings.vault_path
 
@@ -298,17 +299,17 @@ async def handle_resume(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
 
     settings = get_settings()
     vault_path = settings.vault_path
-    period = get_period_for_session(session_type)
 
     await msg.edit_reply_markup(reply_markup=None)
 
     if action == "yes":
-        draft = load_draft(session_type, period, vault_path)
-        if draft is None:
+        found = find_latest_draft(session_type, vault_path)
+        if found is None:
             await msg.answer("Черновик не найден. Начинаю заново.")
             await start_grow_session(bot, msg.chat.id, session_type, state)
             return
 
+        _period, draft = found
         await state.set_state(GrowStates.answering)
         await state.set_data(draft)
 
@@ -322,11 +323,15 @@ async def handle_resume(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
             await _finalize_session(bot, msg.chat.id, state)
 
     elif action == "restart":
-        delete_draft(session_type, period, vault_path)
+        found = find_latest_draft(session_type, vault_path)
+        if found:
+            delete_draft(session_type, found[0], vault_path)
         await start_grow_session(bot, msg.chat.id, session_type, state)
 
     elif action == "cancel":
-        delete_draft(session_type, period, vault_path)
+        found = find_latest_draft(session_type, vault_path)
+        if found:
+            delete_draft(session_type, found[0], vault_path)
         await state.clear()
         await msg.answer("GROW-сессия отменена.")
 
@@ -627,7 +632,7 @@ async def handle_grow_correcting(message: Message, bot: Bot, state: FSMContext) 
         return
 
     data = await state.get_data()
-    session_type: str = data["session_type"]
+    session_type: str = data.get("session_type", "weekly")
     questions: list[dict] = data.get("questions", [])
     answers: dict = data.get("answers", {})
 

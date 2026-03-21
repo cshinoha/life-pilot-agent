@@ -12,7 +12,7 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     builder.button(text="🔍 Найти")
     builder.button(text="🤝 Коуч")
     # Row 2: Планирование и разбор
-    builder.button(text="🧹 Разобрать день")
+    builder.button(text="⚡ Обработать")
     builder.button(text="📋 План")
     builder.button(text="📅 Неделя")
     # Row 3: Информация и помощь

@@ -1,17 +1,20 @@
 #!/bin/bash
-# process-v2.sh — 3-phase daily pipeline with structured logging
-# Parallel testing alongside process.sh for 7 days
+# EXPERIMENTAL — не используется в production
+# d-brain-process.service → process.sh (production path)
+#
+# Тестирует 3-фазный CAPTURE/EXECUTE/REFLECT пайплайн со структурированным логированием.
+# Для активации: изменить ExecStart в deploy/d-brain-process.service
 
 # ── ERROR HANDLING ──
 # No set -e: we handle errors manually per phase
 set -uo pipefail
 
 # ── PATHS ──
-# Set HOME if needed: export HOME="/home/ubuntu"
+export HOME="/home/ubuntu"
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export TZ="${TZ:-Europe/Kyiv}"
 
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PROJECT_DIR="/home/ubuntu/life-pilot"
 VAULT_DIR="$PROJECT_DIR/vault"
 ENV_FILE="$PROJECT_DIR/.env"
 LOG_DIR="$PROJECT_DIR/logs"
@@ -126,7 +129,7 @@ if [ "$DAILY_SIZE" -lt 50 ]; then
     uv run .claude/skills/graph-builder/scripts/analyze.py 2>/dev/null || true
     cd "$PROJECT_DIR"
 
-    git add -A
+    git add daily/ goals/ thoughts/ reflections/ summaries/ attachments/ sessions/ templates/ MEMORY.md .obsidian/ 2>/dev/null
     git commit -m "chore: process daily $TODAY" 2>/dev/null || true
     git push 2>/dev/null || true
 
@@ -271,7 +274,7 @@ fi
 PHASE_START=$(date +%s)
 ((PHASES_TOTAL++))
 
-git add -A
+git add daily/ goals/ thoughts/ reflections/ summaries/ attachments/ sessions/ templates/ MEMORY.md .obsidian/ 2>/dev/null
 COMMIT_HASH=""
 if git commit -m "chore: process daily $TODAY (v2)" 2>/dev/null; then
     git pull --rebase origin main 2>/dev/null || { git rebase --abort 2>/dev/null || true; }

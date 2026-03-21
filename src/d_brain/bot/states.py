@@ -47,3 +47,9 @@ class CoachStates(StatesGroup):
 
     chatting = State()    # Active coaching dialogue
     saving = State()      # Waiting for confirm/skip after "стоп"
+
+
+class WeeklyGoalsStates(StatesGroup):
+    """States for updating weekly goals from staleness prompt."""
+
+    waiting_goals = State()  # Waiting for text or voice with new weekly goals

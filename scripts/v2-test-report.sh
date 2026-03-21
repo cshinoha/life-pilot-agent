@@ -2,7 +2,7 @@
 # v2-test-report.sh — Parse process-v2.log and generate test report
 # Usage: bash scripts/v2-test-report.sh [--telegram] [--days N]
 
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PROJECT_DIR="/home/ubuntu/agent-second-brain"
 LOG_FILE="$PROJECT_DIR/logs/process-v2.log"
 ENV_FILE="$PROJECT_DIR/.env"
 

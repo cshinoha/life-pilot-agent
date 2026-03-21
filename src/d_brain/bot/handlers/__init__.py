@@ -2,11 +2,13 @@
 
 from d_brain.bot.handlers import (
     buttons,
+    coach,
     commands,
     do,
     forward,
     grow,
     grow_scheduler,
+    healthcheck,
     monthly,
     monthly_callbacks,
     photo,
@@ -22,11 +24,13 @@ from d_brain.bot.handlers import (
 
 __all__ = [
     "buttons",
+    "coach",
     "commands",
     "do",
     "forward",
     "grow",
     "grow_scheduler",
+    "healthcheck",
     "monthly",
     "monthly_callbacks",
     "photo",

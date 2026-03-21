@@ -3,10 +3,10 @@ set -e
 
 # PATH for systemd (claude, uv, npx in ~/.local/bin and node)
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
-# Set HOME if needed: export HOME="/home/ubuntu"
+export HOME="/home/ubuntu"
 
 # Paths
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PROJECT_DIR="/home/ubuntu/life-pilot"
 VAULT_DIR="$PROJECT_DIR/vault"
 ENV_FILE="$PROJECT_DIR/.env"
 
@@ -23,7 +23,11 @@ fi
 
 # Date and chat_id
 TODAY=$(date +%Y-%m-%d)
-CHAT_ID="${ALLOWED_USER_IDS//[\[\]]/}"  # remove brackets from [123456]
+CHAT_ID=$(python3 -c "
+import json, os
+ids = json.loads(os.environ.get('ALLOWED_USER_IDS', '[]'))
+print(ids[0] if ids else '')
+" 2>/dev/null || echo "")
 
 cd "$PROJECT_DIR"  # MCP configured for project root
 
@@ -40,7 +44,7 @@ if [ "$DAILY_SIZE" -lt 50 ]; then
     cd "$VAULT_DIR"
     uv run .claude/skills/graph-builder/scripts/analyze.py 2>/dev/null || true
     cd "$PROJECT_DIR"
-    git add -A
+    git add vault/ scripts/ deploy/ src/
     git commit -m "chore: process daily $TODAY" || true
     git push || true
     echo "=== Done (empty daily, graph-only) ==="
@@ -64,7 +68,7 @@ python3 .claude/skills/agent-memory/scripts/memory-engine.py decay . 2>/dev/null
 cd "$PROJECT_DIR"
 
 # Git commit with error reporting to Telegram
-git add -A
+git add vault/ scripts/ deploy/ src/
 git commit -m "chore: process daily $TODAY" || true
 
 if ! git pull --rebase origin main 2>/tmp/git_error.log; then

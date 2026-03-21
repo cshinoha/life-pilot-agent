@@ -116,20 +116,21 @@ async def handle_task_action(callback: CallbackQuery) -> None:
             return
 
         success = False
+        err = ""
         confirm_text = ""
 
         if action == "move":
-            success = await asyncio.to_thread(
+            success, err = await asyncio.to_thread(
                 todoist.move_to_next_monday, task_id,
             )
             confirm_text = "📅 Перенесено на следующий понедельник"
         elif action == "delete":
-            success = await asyncio.to_thread(
+            success, err = await asyncio.to_thread(
                 todoist.delete_task, task_id,
             )
             confirm_text = "🗑 Задача удалена"
         elif action == "done":
-            success = await asyncio.to_thread(
+            success, err = await asyncio.to_thread(
                 todoist.close_task, task_id,
             )
             confirm_text = "✅ Задача выполнена"
@@ -141,6 +142,8 @@ async def handle_task_action(callback: CallbackQuery) -> None:
                 reply_markup=None,
             )
         else:
+            error_detail = f": {err}" if err else ""
             await callback.answer(
-                "❌ Ошибка при обращении к Todoist", show_alert=True,
+                f"❌ Ошибка при обращении к Todoist{error_detail}",
+                show_alert=True,
             )

@@ -17,7 +17,7 @@ async def btn_plan(message: Message) -> None:
     await cmd_plan(message)
 
 
-@router.message(F.text == "🧹 Разобрать день")
+@router.message(F.text == "⚡ Обработать")
 async def btn_process(message: Message, state: FSMContext) -> None:
     """Handle Process button."""
     from d_brain.bot.handlers.process import cmd_process

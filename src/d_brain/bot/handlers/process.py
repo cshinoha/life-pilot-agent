@@ -19,6 +19,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from d_brain.bot.progress import BusyError, run_with_progress
 from d_brain.bot.states import ProcessStates
+from d_brain.bot.undo import register_undo
 from d_brain.bot.utils import send_formatted_report, transcribe_voice
 from d_brain.services.factory import get_git, get_processor
 
@@ -59,17 +60,30 @@ async def _send_report_with_correction(
     status_msg: Message,
     report: dict[str, Any],
     state: FSMContext,
+    *,
+    commit_sha: str = "",
 ) -> None:
-    """Send report and add correction keyboard. Save report in FSM state."""
+    """Send report and add correction + undo keyboard. Save report in FSM state."""
     formatted = report.get("report", report.get("error", ""))
     try:
         await status_msg.edit_text(formatted)
     except Exception:
         await status_msg.edit_text(formatted, parse_mode=None)
 
+    # Build keyboard: correction buttons + undo if commit was made
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Скорректировать", callback_data="process_correct")
+    builder.button(text="✅ Всё ок", callback_data="process_ok")
+    if commit_sha:
+        undo_key = register_undo(commit_sha, "обработка дня")
+        builder.button(text="↩️ Отменить (5 мин)", callback_data=undo_key)
+        builder.adjust(2, 1)
+    else:
+        builder.adjust(2)
+
     await message.answer(
         "Всё верно?",
-        reply_markup=_correction_keyboard(),
+        reply_markup=builder.as_markup(),
     )
     await state.set_data({"last_report": formatted})
 
@@ -81,7 +95,7 @@ async def _finalize_processing(
     day: date,
     state: FSMContext,
 ) -> None:
-    """Run process_daily_finalize, commit, and send report with correction keyboard."""
+    """Run process_daily_finalize, commit, and send report with correction/undo keyboard."""
     processor = get_processor()
     git = get_git()
 
@@ -97,17 +111,27 @@ async def _finalize_processing(
         await status_msg.edit_text(str(e))
         return
 
+    commit_sha = ""
     if "error" not in report:
         today = day.isoformat()
+        # Remember SHA before commit for undo
+        pre_sha = await asyncio.to_thread(git.get_head_sha)
         ok, reason = await asyncio.to_thread(
             git.commit_and_push, f"chore: process daily {today}",
         )
-        if not ok:
+        if ok:
+            commit_sha = await asyncio.to_thread(git.get_head_sha)
+            # Only set if commit actually happened (SHA changed)
+            if commit_sha == pre_sha:
+                commit_sha = ""
+        else:
             report.setdefault("warnings", []).append(
                 f"Vault not synced: {reason[:80]}",
             )
 
-    await _send_report_with_correction(message, status_msg, report, state)
+    await _send_report_with_correction(
+        message, status_msg, report, state, commit_sha=commit_sha,
+    )
 
 
 # ── /process command ──────────────────────────────────────────────────
@@ -151,16 +175,24 @@ async def cmd_process(message: Message, state: FSMContext) -> None:
         except BusyError as e:
             await status_msg.edit_text(str(e))
             return
+        commit_sha = ""
         if "error" not in report:
             today_str = today.isoformat()
+            pre_sha = await asyncio.to_thread(git.get_head_sha)
             ok, reason = await asyncio.to_thread(
                 git.commit_and_push, f"chore: process daily {today_str}"
             )
-            if not ok:
+            if ok:
+                commit_sha = await asyncio.to_thread(git.get_head_sha)
+                if commit_sha == pre_sha:
+                    commit_sha = ""
+            else:
                 report.setdefault("warnings", []).append(
                     f"Vault not synced: {reason[:80]}",
                 )
-        await _send_report_with_correction(message, status_msg, report, state)
+        await _send_report_with_correction(
+            message, status_msg, report, state, commit_sha=commit_sha,
+        )
         return
 
     confident = result.get("confident", [])
@@ -184,7 +216,8 @@ async def cmd_process(message: Message, state: FSMContext) -> None:
 
     first = uncertain[0]
     total = len(uncertain)
-    await status_msg.edit_text(
+    await status_msg.edit_text("✅ Категоризация готова")
+    await message.answer(
         f"❓ Нашёл {total} неоднозначн{'ую запись' if total == 1 else 'ых записей'}. "
         f"Помоги определить категорию:\n\n"
         f"<b>1/{total}:</b> {html_escape(first.get('question', 'Что это?'))}\n\n"

@@ -1,4 +1,4 @@
-# Agent Second Brain
+# Life pilot 
 
 Персональный AI-ассистент для захвата мыслей, голосовых заметок и управления задачами через Telegram. Интегрируется с Claude AI, Obsidian (хранение заметок) и Todoist (задачи). Целевая аудитория — один пользователь (владелец).
 
@@ -187,6 +187,15 @@ Catch-all text handler перехватывает паттерны до обыч
 - **Todoist-ошибки не блокируют обработку** — задача может не создаться, но процесс завершится успешно
 - **Нет мониторинга** — если бот упал, узнаем только когда пользователь заметит
 - **Claude = SPOF** — если Claude CLI недоступен, все AI-фичи не работают
+
+### Исправлено (2026-03-08, техдолг аудит)
+
+- **~~git add -A в process.sh~~** — заменён на `git add vault/ scripts/ deploy/ src/`; исключает случайный коммит `.env`
+- **~~CHAT_ID парсинг bash~~** — заменён на `python3 json.loads`; корректно работает с массивом из нескольких ID
+- **~~google_token_path ~ не раскрывается в systemd~~** — добавлен `field_validator expand_home` в config.py; покрывает и `vault_path`
+- **~~.env.example неверный комментарий~~** — `empty = allow all` заменён на предупреждение; добавлен `ALLOW_ALL_USERS=false`
+- **~~Нет тестов~~** — добавлены 18 smoke-тестов: `tests/test_config.py`, `tests/test_vault_storage.py`, `tests/test_processor_parse.py`
+- **~~Дрейф документации и entrypoints~~** — README.ru.md, start-bot.sh, process-v2.sh выровнены с реальностью
 
 ### Исправлено (2026-03-01)
 

@@ -532,3 +532,15 @@ async def scheduled_coach_compact(bot: Bot, chat_id: int) -> None:
         await bot.send_message(chat_id, f"📊 {report}")
     except Exception:
         logger.exception("Failed to send coach compact notification")
+
+
+async def scheduled_daily_plan(bot: Bot, chat_id: int) -> None:
+    """Send morning daily plan at configured time."""
+    import asyncio
+
+    processor = get_processor()
+    try:
+        plan = await asyncio.to_thread(processor.get_daily_plan)
+        await bot.send_message(chat_id, plan)
+    except Exception:
+        logger.exception("Failed to send daily plan")

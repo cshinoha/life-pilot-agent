@@ -45,10 +45,13 @@ def create_dispatcher() -> Dispatcher:
         weekly_callbacks,
     )
 
+    from d_brain.bot.undo import router as undo_router
+
     # Use memory storage for FSM (required for /do command state)
     dp = Dispatcher(storage=MemoryStorage())
 
     # Register routers - ORDER MATTERS
+    dp.include_router(undo_router)  # Undo callbacks — before everything
     dp.include_router(commands.router)
     dp.include_router(process.router)
     dp.include_router(weekly.router)
@@ -128,6 +131,7 @@ def create_scheduler(bot: Bot, settings: Settings):  # type: ignore[no-untyped-d
 
     from d_brain.bot.handlers.grow_scheduler import (
         scheduled_coach_compact,
+        scheduled_daily_plan,
         scheduled_grow_monthly,
         scheduled_grow_quarterly,
         scheduled_grow_weekly,
@@ -139,7 +143,7 @@ def create_scheduler(bot: Bot, settings: Settings):  # type: ignore[no-untyped-d
         scheduled_monthly_report,
     )
 
-    tz = pytz.timezone("Europe/Kyiv")
+    tz = pytz.timezone(settings.timezone)
     scheduler = AsyncIOScheduler(timezone=tz)
 
     chat_id = _get_first_allowed_chat(settings)
@@ -171,11 +175,11 @@ def create_scheduler(bot: Bot, settings: Settings):  # type: ignore[no-untyped-d
         replace_existing=True,
     )
 
-    # GROW weekly — Saturday at 20:30 (reflection request)
+    # GROW weekly — Sat/Sun/Mon at 20:30 (retry logic skips if already done this week)
     scheduler.add_job(
         scheduled_grow_weekly,
         trigger="cron",
-        day_of_week="sat",
+        day_of_week="sat,sun,mon",
         hour=20,
         minute=30,
         kwargs={"bot": bot, "chat_id": chat_id},
@@ -249,6 +253,17 @@ def create_scheduler(bot: Bot, settings: Settings):  # type: ignore[no-untyped-d
         replace_existing=True,
     )
 
+    # Daily plan — every day at 11:00
+    scheduler.add_job(
+        scheduled_daily_plan,
+        trigger="cron",
+        hour=11,
+        minute=0,
+        kwargs={"bot": bot, "chat_id": chat_id},
+        id="daily_plan",
+        replace_existing=True,
+    )
+
     # Coach profile compact — 1st of each month at 03:00
     scheduler.add_job(
         scheduled_coach_compact,
@@ -261,11 +276,25 @@ def create_scheduler(bot: Bot, settings: Settings):  # type: ignore[no-untyped-d
         replace_existing=True,
     )
 
+    # Weekly healthcheck — Sunday at 22:00
+    from d_brain.bot.handlers.healthcheck import scheduled_healthcheck
+
+    scheduler.add_job(
+        scheduled_healthcheck,
+        trigger="cron",
+        day_of_week="wed,sun",
+        hour=22,
+        minute=0,
+        kwargs={"bot": bot, "chat_id": chat_id},
+        id="weekly_healthcheck",
+        replace_existing=True,
+    )
+
     logger.info(
-        "Scheduler configured: monthly (1st 20:30), "
-        "reminders (2-3rd 21:00), "
-        "GROW weekly/monthly/quarterly/yearly, "
-        "coach compact (1st 22:00)"
+        "Scheduler configured: healthcheck (09:00), daily plan (11:00), "
+        "monthly (1st 20:30), reminders (2-3rd 21:00), "
+        "GROW weekly (sat/sun/mon 20:30 with retry)/monthly/quarterly/yearly, "
+        "coach compact (1st 03:00)"
     )
     return scheduler
 

@@ -434,6 +434,33 @@ def delete_draft(
         logger.info("Draft deleted: %s", draft_path)
 
 
+def find_latest_draft(
+    session_type: str, vault_path: Path
+) -> tuple[str, dict] | None:
+    """Find most recent draft for session_type, regardless of period.
+
+    Returns (period, data) or None. Used to resume drafts when the date may
+    have changed since the session started (e.g. past midnight Dec 31 → Jan 1).
+    """
+    draft_dir = vault_path / "reflections" / session_type
+    if not draft_dir.exists():
+        return None
+    drafts = sorted(
+        draft_dir.glob("*.draft.md"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not drafts:
+        return None
+    period = drafts[0].stem.removesuffix(".draft")
+    try:
+        data = json.loads(drafts[0].read_text(encoding="utf-8"))
+        return period, data
+    except Exception:
+        logger.warning("Failed to parse draft %s", drafts[0])
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Context collection
 # ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ _ZOOM_IN_RE = re.compile(
     r"|потерялся|за что хвататься|не знаю с чего|не понимаю что делать",
     re.IGNORECASE,
 )
+_URL_RE = re.compile(r"https?://\S+")
 
 
 @router.message(lambda m: m.text is not None and not m.text.startswith("/"))
@@ -67,7 +68,12 @@ async def handle_text(message: Message) -> None:
     storage = VaultStorage(settings.vault_path)
 
     timestamp = datetime.fromtimestamp(message.date.timestamp())
-    storage.append_to_daily(text, timestamp, "[text]")
 
-    await message.answer("✓ Сохранено")
-    logger.info("Text message saved: %d chars", len(text))
+    if _URL_RE.search(text):
+        storage.append_to_daily(text, timestamp, "[link]")
+        await message.answer("✓ Сохранено как ссылка")
+        logger.info("Link message saved: %d chars", len(text))
+    else:
+        storage.append_to_daily(text, timestamp, "[text]")
+        await message.answer("✓ Сохранено")
+        logger.info("Text message saved: %d chars", len(text))

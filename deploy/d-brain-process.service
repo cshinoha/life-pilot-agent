@@ -3,7 +3,9 @@ Description=d-brain Daily Processing
 
 [Service]
 Type=oneshot
-User=shima
-WorkingDirectory=/home/ubuntu/life-pilot-agent
-ExecStart=/home/ubuntu/life-pilot-agent/scripts/process.sh
+User=ubuntu
+WorkingDirectory=/home/ubuntu/life-pilot
+ExecStart=/home/ubuntu/life-pilot/scripts/process.sh
 Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/systemd/system/d-brain.env

@@ -12,10 +12,11 @@ import pytz
 from .calendar_integration import get_calendar_events
 from .claude_runner import ClaudeRunner
 from .todoist import TodoistService
+from d_brain.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-_TZ = pytz.timezone("Europe/Kyiv")
+_TZ = pytz.timezone(get_settings().timezone)
 
 
 class ClaudeProcessor:
@@ -97,6 +98,8 @@ week: {year}-W{week:02d}
 
 ДНЕВНИК:
 {content}
+
+ВАЖНО: Записи с тегами [forward from: ...] и [link] — это входящие материалы (inbox). НЕ классифицируй их и НЕ создавай из них задачи или заметки. В отчёте просто укажи: 'Сохранено N ссылок/пересланных сообщений'. Пропусти такие записи при классификации.
 
 ЗАДАЧА: Классифицируй каждую запись на:
 - task: явное действие, требующее выполнения ("купить", "позвонить", "сделать X")
@@ -1152,8 +1155,14 @@ updated: {today.isoformat()}
         moved_count = 0
         if self.todoist and fresh_overdue:
             for task in fresh_overdue:
-                if self.todoist.reschedule_to_today(task['id']):
+                ok, err = self.todoist.reschedule_to_today(task['id'])
+                if ok:
                     moved_count += 1
+                else:
+                    logger.warning(
+                        "Failed to reschedule task %s (%s): %s",
+                        task.get('id'), task.get('content', '')[:50], err,
+                    )
 
         # Расчёт времени
         work_start = today.replace(

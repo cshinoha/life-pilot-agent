@@ -1,5 +1,6 @@
 """Handler for /do command - arbitrary Claude requests."""
 
+import asyncio
 import logging
 from html import escape as html_escape
 
@@ -10,8 +11,9 @@ from aiogram.types import Message
 
 from d_brain.bot.progress import BusyError, run_with_progress
 from d_brain.bot.states import DoCommandState
+from d_brain.bot.undo import build_undo_keyboard, register_undo
 from d_brain.bot.utils import send_formatted_report, transcribe_voice
-from d_brain.services.factory import get_processor
+from d_brain.services.factory import get_git, get_processor
 
 router = Router(name="do")
 logger = logging.getLogger(__name__)
@@ -60,6 +62,10 @@ async def process_request(message: Message, prompt: str) -> None:
     status_msg = await message.answer("⏳ Выполняю...")
 
     processor = get_processor()
+    git = get_git()
+
+    # Remember state before execution for undo
+    pre_sha = await asyncio.to_thread(git.get_head_sha)
 
     try:
         report = await run_with_progress(
@@ -71,3 +77,12 @@ async def process_request(message: Message, prompt: str) -> None:
         return
 
     await send_formatted_report(status_msg, report)
+
+    # Check if vault was changed — offer undo if so
+    post_sha = await asyncio.to_thread(git.get_head_sha)
+    if post_sha != pre_sha:
+        undo_key = register_undo(post_sha, "команда ИИ")
+        await message.answer(
+            "↩️ Можно отменить в течение 5 минут:",
+            reply_markup=build_undo_keyboard(undo_key),
+        )

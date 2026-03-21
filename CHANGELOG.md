@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.3.1] — 2026-03-08
+
+### Fixes
+- `process.sh`: `git add -A` → `git add vault/ scripts/ deploy/ src/` — исключает случайный коммит `.env`
+- `process.sh`: CHAT_ID парсинг через `python3 json.loads` вместо bash string replace (корректно для нескольких ID)
+- `config.py`: добавлен `field_validator expand_home` для `vault_path` и `google_token_path` — `~` раскрывается в systemd окружении
+- `services/grow.py`: добавлена `find_latest_draft()` — GROW resume находит черновик по mtime независимо от текущей даты (устраняет потерю черновика при смене даты Dec 31 → Jan 1)
+- `bot/handlers/grow.py`: `handle_confirm_resume` использует `find_latest_draft` для yes/restart/cancel вместо пересчёта period
+
+### Docs
+- `.env.example`: исправлен неверный комментарий (`empty = allow all`), добавлен `ALLOW_ALL_USERS=false` с предупреждением безопасности
+- `README.ru.md`: выровнена с реальной архитектурой (Python/aiogram, process.sh как prod, process-v2.sh как experimental)
+- `scripts/start-bot.sh`: entrypoint → `python -m d_brain` (соответствует pyproject.toml)
+- `scripts/process-v2.sh`: явный EXPERIMENTAL header с инструкцией активации
+
+### Tests
+- Добавлены 18 smoke-тестов: `tests/test_config.py`, `tests/test_vault_storage.py`, `tests/test_processor_parse.py`
+- Покрытие: Settings (expanduser, defaults, validation), VaultStorage (CRUD), ClaudeProcessor.categorize_daily (JSON parse, fallback, error passthrough)
+
+---
+
 ## [1.3.0] — 2026-03-07
 
 ### UI & Interface

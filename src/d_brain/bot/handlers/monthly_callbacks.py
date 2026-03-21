@@ -108,10 +108,10 @@ async def handle_reformulation_input(message: Message, state: FSMContext) -> Non
         await message.answer("❌ Todoist API key не настроен")
         return
 
-    success = await asyncio.to_thread(
+    ok, err = await asyncio.to_thread(
         todoist.update_content, task_id, new_content,
     )
-    if success:
+    if ok:
         await message.answer(
             f"✅ Задача переформулирована:\n"
             f"<i>{html_escape(new_content)}</i>"
@@ -119,7 +119,8 @@ async def handle_reformulation_input(message: Message, state: FSMContext) -> Non
         settings = get_settings()
         _set_monthly_processed(settings.vault_path)
     else:
-        await message.answer("❌ Ошибка при обращении к Todoist")
+        error_detail = f"\n⚠️ Todoist: {err}" if err else ""
+        await message.answer(f"❌ Ошибка при обращении к Todoist{error_detail}")
 
 
 # ── Legacy goal handlers (unchanged) ─────────────────────────────────

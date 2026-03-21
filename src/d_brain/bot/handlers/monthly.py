@@ -20,7 +20,7 @@ from d_brain.services.vault_search import search_vault
 router = Router(name="monthly")
 logger = logging.getLogger(__name__)
 
-_TZ = pytz.timezone("Europe/Kyiv")
+_TZ = pytz.timezone(get_settings().timezone)
 
 
 # ── Monthly flag helpers ──────────────────────────────────────────────

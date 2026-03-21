@@ -3,7 +3,7 @@
 # Usage: bash scripts/v2-compare.sh [YYYY-MM-DD]
 
 DATE=${1:-$(date +%Y-%m-%d)}
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PROJECT_DIR="/home/ubuntu/agent-second-brain"
 V1_LOG="/var/log/d-brain-cron.log"
 V2_LOG="$PROJECT_DIR/logs/process-v2.log"
 

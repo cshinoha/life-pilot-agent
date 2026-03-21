@@ -1,15 +1,16 @@
 [Unit]
-Description=d-brain Telegram Bot
+Description=D-Brain Telegram Bot
 After=network.target
 
 [Service]
 Type=simple
-User=shima
-WorkingDirectory=/home/ubuntu/life-pilot-agent
-ExecStart=/home/ubuntu/.local/bin/uv run python -m d_brain
-Restart=always
+User=ubuntu
+WorkingDirectory=/home/ubuntu/life-pilot
+ExecStart=/home/ubuntu/life-pilot/scripts/start-bot.sh
+Restart=on-failure
 RestartSec=10
-Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/ubuntu/.local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/systemd/system/d-brain.env
 
 [Install]
 WantedBy=multi-user.target

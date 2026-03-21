@@ -10,23 +10,26 @@ import pytz
 
 def get_calendar_events(
     days_ahead: int = 0,
-    timezone: str = "Europe/Kyiv",
+    timezone: str | None = None,
     token_path: Path | None = None,
 ) -> list[dict[str, str]]:
     """
     Получает события из Google Calendar
-    
+
     Args:
         days_ahead: на сколько дней вперёд (0 = сегодня, 7 = неделя)
-        timezone: временная зона
+        timezone: временная зона (None = читать из Settings)
         token_path: путь к файлу токена (JSON). Если None — дефолт из Settings.
-    
+
     Returns:
         list: события [{summary, start, end, description}]
     """
+    from d_brain.config import get_settings
+    settings = get_settings()
+    if timezone is None:
+        timezone = settings.timezone
     if token_path is None:
-        from d_brain.config import get_settings
-        token_path = Path(os.path.expanduser(str(get_settings().google_token_path)))
+        token_path = Path(os.path.expanduser(str(settings.google_token_path)))
     else:
         token_path = Path(os.path.expanduser(str(token_path)))
 
