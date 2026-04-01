@@ -10,7 +10,7 @@ from aiogram.types import Message
 from life_pilot.bot.utils import download_telegram_file
 from life_pilot.config import get_settings
 from life_pilot.services.storage import VaultStorage
-from life_pilot.services.transcription import DeepgramTranscriber
+from life_pilot.services.transcription import GroqTranscriber
 
 router = Router(name="voice")
 logger = logging.getLogger(__name__)
@@ -26,9 +26,8 @@ async def handle_voice(message: Message, bot: Bot) -> None:
 
     settings = get_settings()
     storage = VaultStorage(settings.vault_path)
-    transcriber = DeepgramTranscriber(
-        settings.deepgram_api_key, settings.transcription_language,
-    )
+    api_key = settings.groq_api_key or settings.deepgram_api_key
+    transcriber = GroqTranscriber(api_key, settings.transcription_language)
 
     try:
         audio_bytes, _ = await download_telegram_file(bot, message.voice.file_id)

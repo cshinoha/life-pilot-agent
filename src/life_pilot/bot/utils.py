@@ -53,17 +53,16 @@ async def send_formatted_report(
 
 
 async def transcribe_voice(bot: Bot, message: "Message") -> str | None:
-    """Download voice message, transcribe via Deepgram, return text or None.
+    """Download voice message, transcribe via Groq Whisper, return text or None.
 
     On failure, sends an error message to the user and returns None.
     """
     from life_pilot.config import get_settings
-    from life_pilot.services.transcription import DeepgramTranscriber
+    from life_pilot.services.transcription import GroqTranscriber
 
     settings = get_settings()
-    transcriber = DeepgramTranscriber(
-        settings.deepgram_api_key, settings.transcription_language,
-    )
+    api_key = settings.groq_api_key or settings.deepgram_api_key
+    transcriber = GroqTranscriber(api_key, settings.transcription_language)
     try:
         audio_bytes, _ = await download_telegram_file(
             bot, message.voice.file_id
