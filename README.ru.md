@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="Life Pilot Agent" width="200" />
+  <img src="docs/logo.png" alt="Life Pilot Agent" width="400" />
 </p>
 
 # Life Pilot Agent
