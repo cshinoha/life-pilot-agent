@@ -19,6 +19,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from d_brain.bot.progress import BusyError, run_with_progress
 from d_brain.bot.states import ProcessStates
+from d_brain.bot.undo import schedule_button_removal
 from d_brain.bot.utils import send_formatted_report, transcribe_voice
 from d_brain.services.factory import get_git, get_processor
 
@@ -67,10 +68,11 @@ async def _send_report_with_correction(
     except Exception:
         await status_msg.edit_text(formatted, parse_mode=None)
 
-    await message.answer(
+    btn_msg = await message.answer(
         "Всё верно?",
         reply_markup=_correction_keyboard(),
     )
+    asyncio.create_task(schedule_button_removal(btn_msg))
     await state.set_data({"last_report": formatted})
 
 

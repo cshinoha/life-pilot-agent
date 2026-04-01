@@ -47,3 +47,9 @@ class CoachStates(StatesGroup):
 
     chatting = State()    # Active coaching dialogue
     saving = State()      # Waiting for confirm/skip after "стоп"
+
+
+class ChatStates(StatesGroup):
+    """States for free chat with Claude."""
+
+    chatting = State()    # Active free chat dialogue

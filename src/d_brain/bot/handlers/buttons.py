@@ -17,7 +17,7 @@ async def btn_plan(message: Message) -> None:
     await cmd_plan(message)
 
 
-@router.message(F.text == "⚙️ Обработать")
+@router.message(F.text.in_({"⚙️ Обработать", "⚡ Обработать"}))
 async def btn_process(message: Message, state: FSMContext) -> None:
     """Handle Process button."""
     from d_brain.bot.handlers.process import cmd_process
@@ -33,15 +33,15 @@ async def btn_weekly(message: Message) -> None:
     await cmd_weekly(message)
 
 
-@router.message(F.text == "📌 Задача")
+@router.message(F.text.in_({"📌 Задача", "🔍 Найти"}))
 async def btn_recall(message: Message, state: FSMContext) -> None:
-    """Handle Recall button — enter search FSM."""
+    """Handle Recall/Find button — enter search FSM."""
     from d_brain.bot.handlers.recall import cmd_recall
 
     await cmd_recall(message, state, command=None)
 
 
-@router.message(F.text == "✨ Запрос")
+@router.message(F.text.in_({"✨ Запрос", "🤖 Сделать"}))
 async def btn_do(message: Message, state: FSMContext) -> None:
     """Handle Do button - set state and wait for input."""
     await state.set_state(DoCommandState.waiting_for_input)
@@ -57,6 +57,14 @@ async def btn_status(message: Message) -> None:
     from d_brain.bot.handlers.commands import cmd_status
 
     await cmd_status(message)
+
+
+@router.message(F.text == "ℹ️ Помощь")
+async def btn_help(message: Message) -> None:
+    """Handle Help button."""
+    from d_brain.bot.handlers.commands import cmd_help
+
+    await cmd_help(message)
 
 
 @router.message(F.text == "🏥 Здоровье")
@@ -81,3 +89,11 @@ async def btn_creative(message: Message) -> None:
     from d_brain.bot.handlers.vault_tools import cmd_creative
 
     await cmd_creative(message, command=None)
+
+
+@router.message(F.text == "💬 Чат")
+async def btn_chat(message: Message, state: FSMContext) -> None:
+    """Handle Chat button — start free chat FSM."""
+    from d_brain.bot.handlers.chat import start_chat
+
+    await start_chat(message, state)

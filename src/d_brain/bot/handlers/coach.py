@@ -9,7 +9,12 @@ from html import escape as html_escape
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InaccessibleMessage, Message
+from aiogram.types import (
+    CallbackQuery,
+    InaccessibleMessage,
+    InlineKeyboardMarkup,
+    Message,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from d_brain.bot.progress import BusyError, run_with_progress
@@ -31,6 +36,19 @@ _WELCOME = (
 )
 
 
+def _zoom_keyboard() -> InlineKeyboardMarkup:
+    """Return inline keyboard with Zoom Out / Zoom In buttons."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🔭 Zoom Out", callback_data="coach_zoom_out",
+    )
+    builder.button(
+        text="🔬 Zoom In", callback_data="coach_zoom_in",
+    )
+    builder.adjust(2)
+    return builder.as_markup()
+
+
 # ---------------------------------------------------------------------------
 # Entry points
 # ---------------------------------------------------------------------------
@@ -40,7 +58,7 @@ async def _start_coach(message: Message, state: FSMContext) -> None:
     """Shared entry: clear any previous state, start coach FSM."""
     await state.set_state(CoachStates.chatting)
     await state.set_data({"history": [], "turn": 0})
-    await message.answer(_WELCOME)
+    await message.answer(_WELCOME, reply_markup=_zoom_keyboard())
 
 
 @router.message(Command("coach"))
@@ -189,3 +207,56 @@ async def handle_coach_close(callback: CallbackQuery, state: FSMContext) -> None
     await msg.edit_reply_markup(reply_markup=None)
     await state.clear()
     await msg.answer("Coach Mode выключен.")
+
+
+# ---------------------------------------------------------------------------
+# Zoom callbacks
+# ---------------------------------------------------------------------------
+
+
+@router.callback_query(F.data == "coach_zoom_out")
+async def handle_zoom_out(callback: CallbackQuery) -> None:
+    """Zoom Out — big-picture perspective from coaching context."""
+    await callback.answer("🔭 Zoom Out...")
+
+    msg = callback.message
+    if msg is None or isinstance(msg, InaccessibleMessage):
+        return
+
+    await msg.edit_reply_markup(reply_markup=None)
+    status_msg = await msg.answer("🔭 Смотрю на большую картину...")
+    processor = get_processor()
+    try:
+        report = await run_with_progress(
+            processor.zoom_out,
+            status_msg,
+            "🔭 Смотрю на большую картину...",
+        )
+    except BusyError as e:
+        await status_msg.edit_text(str(e))
+        return
+    await send_formatted_report(status_msg, report)
+
+
+@router.callback_query(F.data == "coach_zoom_in")
+async def handle_zoom_in(callback: CallbackQuery) -> None:
+    """Zoom In — concrete actions for today."""
+    await callback.answer("🔬 Zoom In...")
+
+    msg = callback.message
+    if msg is None or isinstance(msg, InaccessibleMessage):
+        return
+
+    await msg.edit_reply_markup(reply_markup=None)
+    status_msg = await msg.answer("🎯 Собираю конкретные действия...")
+    processor = get_processor()
+    try:
+        report = await run_with_progress(
+            processor.zoom_in,
+            status_msg,
+            "🎯 Собираю конкретные действия...",
+        )
+    except BusyError as e:
+        await status_msg.edit_text(str(e))
+        return
+    await send_formatted_report(status_msg, report)

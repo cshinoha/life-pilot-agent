@@ -1,7 +1,7 @@
 [project]
 name = "life-pilot-agent"
-version = "1.0.0"
-description = "Voice-first personal assistant for Telegram with Obsidian and Todoist integration"
+version = "2.0.0"
+description = "AI life assistant — captures thoughts, manages tasks, coaches you, and holds free-form conversations via Telegram"
 readme = "README.md"
 authors = [
     { name = "Your Name", email = "your@email.com" }

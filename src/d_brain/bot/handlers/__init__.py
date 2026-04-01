@@ -2,6 +2,8 @@
 
 from d_brain.bot.handlers import (
     buttons,
+    chat,
+    coach,
     commands,
     do,
     forward,
@@ -22,6 +24,8 @@ from d_brain.bot.handlers import (
 
 __all__ = [
     "buttons",
+    "chat",
+    "coach",
     "commands",
     "do",
     "forward",

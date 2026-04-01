@@ -27,6 +27,7 @@ def create_dispatcher() -> Dispatcher:
     """Create and configure the dispatcher with routers."""
     from d_brain.bot.handlers import (
         buttons,
+        chat,
         coach,
         commands,
         do,
@@ -60,6 +61,7 @@ def create_dispatcher() -> Dispatcher:
     dp.include_router(recall.router)
     dp.include_router(do.router)  # Before voice/text to catch FSM state
     dp.include_router(coach.router)  # Coach Mode FSM — before buttons/text
+    dp.include_router(chat.router)   # Free chat FSM — after coach, before text
     dp.include_router(vault_tools.router)  # /health, /memory, /creative
     dp.include_router(buttons.router)  # Reply keyboard buttons
     dp.include_router(voice.router)

@@ -10,6 +10,7 @@ from aiogram.types import Message
 
 from d_brain.bot.progress import BusyError, run_with_progress
 from d_brain.bot.states import DoCommandState
+from d_brain.bot.undo import schedule_button_removal  # noqa: F401
 from d_brain.bot.utils import send_formatted_report, transcribe_voice
 from d_brain.services.factory import get_processor
 

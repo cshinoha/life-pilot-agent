@@ -24,9 +24,9 @@ src/d_brain/
 ├── config.py                # Pydantic Settings из .env
 ├── bot/
 │   ├── main.py              # Инициализация бота, регистрация роутеров
-│   ├── keyboards.py         # Reply-клавиатура (10 кнопок, 4 строки)
+│   ├── keyboards.py         # Reply-клавиатура (12 кнопок, 4 строки)
 │   ├── formatters.py        # HTML-форматирование отчётов
-│   ├── states.py            # FSM-состояния (DoCommand, Process, Monthly, Grow, Reflection, Recall, Coach)
+│   ├── states.py            # FSM-состояния (DoCommand, Process, Monthly, Grow, Reflection, Recall, Coach, Chat)
 │   ├── utils.py             # download_telegram_file, transcribe_voice, send_formatted_report
 │   ├── progress.py          # run_with_progress() — async wrapper
 │   ├── components/
@@ -42,6 +42,8 @@ src/d_brain/
 │       ├── grow.py          # GROW coaching FSM (answering/confirming/correcting)
 │       ├── grow_scheduler.py # Scheduled GROW triggers (weekly/monthly/quarterly/yearly)
 │       ├── coach.py         # Coach Mode FSM (chatting/saving) — /coach + 🤝 Коуч кнопка
+│       ├── chat.py          # Free Chat — прямой диалог с Claude (💬 Чат кнопка)
+│       ├── healthcheck.py   # Vault healthcheck scheduler (Wed+Sun 22:00)
 │       ├── reflection.py    # DEPRECATED stub — редиректит старые кнопки на GROW
 │       ├── recall.py        # /recall — поиск по vault
 │       ├── vault_tools.py   # /health, /memory, /creative — утилиты vault
@@ -99,7 +101,7 @@ scripts/                     # Скрипты автоматизации (proces
 
 ### Порядок регистрации роутеров (важен для FSM)
 
-commands → process → weekly → weekly_callbacks → monthly → monthly_callbacks → grow → reflection → recall → do → **coach** → vault_tools → buttons → voice → photo → forward → text (catch-all последний)
+commands → process → weekly → weekly_callbacks → monthly → monthly_callbacks → grow → reflection → recall → do → **coach** → **chat** → healthcheck → vault_tools → buttons → voice → photo → forward → text (catch-all последний)
 
 ## Правила
 
@@ -150,12 +152,14 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 после каждой GROW-сессии и Coach-сессии. Включается во все `/do` запросы
 (первые 2000 символов).
 
-### Zoom In / Zoom Out (bot/handlers/text.py + services/processor.py)
-Catch-all text handler перехватывает паттерны до обычного сохранения в vault:
-- Паттерны zoom out: "zoom out", "погряз", "нет смысла", "потерял нить",
-  "большая картина", "зачем всё это" → `processor.zoom_out()`
-- Паттерны zoom in: "zoom in", "витаю в облаках", "что делать сегодня",
-  "с чего начать", "потерялся", "за что хвататься" → `processor.zoom_in()`
+### Zoom In / Zoom Out (bot/handlers/coach.py)
+В v2.0 zoom-функции вынесены из catch-all text handler в Coach Mode как явные кнопки:
+- **🔍 Zoom In** — inline-кнопка в Coach Mode, вызывает `processor.zoom_in()`.
+  Когда пользователь витает в облаках — даёт конкретные шаги на сегодня.
+- **🔭 Zoom Out** — inline-кнопка в Coach Mode, вызывает `processor.zoom_out()`.
+  Когда пользователь погряз в деталях — возвращает к большой картине.
+- Автоматические триггеры по паттернам текста убраны — больше не срабатывают на случайные фразы.
+- Кнопки доступны только внутри активной Coach-сессии (FSM state: CoachStates.chatting).
 
 ### Coach Mode (bot/handlers/coach.py)
 Режим диалогового коучинга. `/coach` или кнопка "🤝 Коуч" запускают FSM-сессию:
@@ -164,6 +168,14 @@ Catch-all text handler перехватывает паттерны до обыч
 - "стоп" → предложение сохранить инсайты
 - `processor.save_coach_insights(history)` — обновляет coaching_context.md,
   дописывает итог в daily vault
+
+### Free Chat (bot/handlers/chat.py)
+Прямой диалог с Claude без протоколов. Кнопка "💬 Чат" запускает FSM-сессию:
+- `ChatStates.chatting` — свободный диалог, история сообщений в памяти
+- Голосовые сообщения поддерживаются (транскрипция через Deepgram)
+- Контекст vault и coaching_context.md доступны Claude
+- "стоп" или "выход" завершает сессию
+- В отличие от Coach Mode — нет zoom-кнопок и предложения сохранить инсайты
 
 ### Auto-generate 2-monthly.md (services/processor.py + bot/handlers/grow.py)
 После завершения monthly GROW (`handle_confirm`):

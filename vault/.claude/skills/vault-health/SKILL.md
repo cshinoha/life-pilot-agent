@@ -243,7 +243,7 @@ generate_moc.py, fix_links.py, backlinks.sh — manual run as needed.
 
 ## References
 
-- `references/arscontexta-patterns.md` — patterns from arscontexta, adapted for agent-second-brain
+- `references/arscontexta-patterns.md` — patterns from arscontexta, adapted for Life Pilot
 - `.claude/rules/weekly-reflection.md` — template for weekly reflections
 
 ## Relevant Skills
