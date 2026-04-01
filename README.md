@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="Life Pilot Agent" width="200" />
+</p>
+
 # Life Pilot Agent -- AI Life Assistant
 
 **A personal AI assistant designed by a practicing psychologist.**

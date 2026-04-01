@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="Life Pilot Agent" width="200" />
+</p>
+
 # Life Pilot Agent
 
 **Система управления жизнью на базе AI, спроектированная практикующим психологом.**
