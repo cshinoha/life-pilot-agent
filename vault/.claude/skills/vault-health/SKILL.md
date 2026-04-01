@@ -249,4 +249,4 @@ generate_moc.py, fix_links.py, backlinks.sh — manual run as needed.
 ## Relevant Skills
 
 - [[vault/.claude/skills/graph-builder/SKILL|graph-builder]] — core graph analysis (analyze.py)
-- [[vault/.claude/skills/dbrain-processor/SKILL|dbrain-processor]] — daily processing pipeline
+- [[vault/.claude/skills/life-pilot-processor/SKILL|life-pilot-processor]] — daily processing pipeline

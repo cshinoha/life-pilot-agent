@@ -1,0 +1,9 @@
+[Unit]
+Description=life-pilot Daily Processing
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/life-pilot-agent
+ExecStart=/home/ubuntu/life-pilot-agent/scripts/process.sh
+Environment=PYTHONUNBUFFERED=1

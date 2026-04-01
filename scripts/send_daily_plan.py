@@ -7,8 +7,8 @@ import sys
 import os; sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 
 from aiogram import Bot
-from d_brain.config import get_settings
-from d_brain.services.processor import ClaudeProcessor
+from life_pilot.config import get_settings
+from life_pilot.services.processor import ClaudeProcessor
 
 
 async def send_daily_plan():

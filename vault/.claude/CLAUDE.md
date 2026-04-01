@@ -1,11 +1,11 @@
 ---
 type: note
-title: Agent Second Brain
+title: Life Pilot
 last_accessed: 2026-01-31
 relevance: 0.59
 tier: cold
 ---
-# Agent Second Brain
+# Life Pilot
 
 Voice-first personal assistant for capturing thoughts and managing tasks via Telegram.
 
@@ -162,13 +162,13 @@ tier: active
 
 | Skill | Purpose |
 |-------|---------|
-| `dbrain-processor` | Main daily processing (3-phase pipeline) |
+| `life-pilot-processor` | Main daily processing (3-phase pipeline) |
 | `graph-builder` | Vault link analysis and building |
 | `vault-health` | Health scoring, MOC generation, link repair |
 | `agent-memory` | Card template, decay engine, tiered search |
 | `todoist-ai` | Todoist task management via MCP |
 
-- **Processing:** `.claude/skills/dbrain-processor/SKILL.md`
+- **Processing:** `.claude/skills/life-pilot-processor/SKILL.md`
 - **Graph Builder:** `.claude/skills/graph-builder/SKILL.md`
 - **Vault Health:** `.claude/skills/vault-health/SKILL.md`
 - **Agent Memory:** `.claude/skills/agent-memory/SKILL.md`

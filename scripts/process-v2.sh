@@ -146,7 +146,7 @@ PHASE_START=$(date +%s)
 cd "$VAULT_DIR"
 
 CAPTURE_RAW=$(claude --print --dangerously-skip-permissions \
-    -p "Today is $TODAY. Read .claude/skills/dbrain-processor/phases/capture.md and execute Phase 1.
+    -p "Today is $TODAY. Read .claude/skills/life-pilot-processor/phases/capture.md and execute Phase 1.
 Read daily/$TODAY.md, goals/3-weekly.md, goals/2-monthly.md, goals/$YEARLY_GOALS_NAME.
 Classify each entry. Return ONLY JSON." \
     2>&1) || true
@@ -166,7 +166,7 @@ if grep -q '"error"' "$CAPTURE_FILE" 2>/dev/null; then
     # Fallback to monolith mode
     REPORT=$(claude --print --dangerously-skip-permissions \
         --mcp-config "$PROJECT_DIR/mcp-config.json" \
-        -p "Today is $TODAY. Execute daily processing according to dbrain-processor skill.
+        -p "Today is $TODAY. Execute daily processing according to life-pilot-processor skill.
 $MCP_PROMPT" \
         2>&1) || true
 
@@ -187,7 +187,7 @@ else
 
     EXECUTE_RAW=$(claude --print --dangerously-skip-permissions \
         --mcp-config "$PROJECT_DIR/mcp-config.json" \
-        -p "Today is $TODAY. Read .claude/skills/dbrain-processor/phases/execute.md and execute Phase 2.
+        -p "Today is $TODAY. Read .claude/skills/life-pilot-processor/phases/execute.md and execute Phase 2.
 Read .session/capture.json for input data.
 Read business/_index.md and projects/_index.md for context.
 Create tasks in Todoist, save thoughts, update CRM. Return ONLY JSON.
@@ -214,7 +214,7 @@ $MCP_PROMPT" \
     ((PHASES_TOTAL++))
 
     REPORT=$(claude --print --dangerously-skip-permissions \
-        -p "Today is $TODAY. Read .claude/skills/dbrain-processor/phases/reflect.md and execute Phase 3.
+        -p "Today is $TODAY. Read .claude/skills/life-pilot-processor/phases/reflect.md and execute Phase 3.
 Read .session/capture.json and .session/execute.json for input data.
 Read MEMORY.md, .session/handoff.md, .graph/health-history.json.
 Generate HTML report, update MEMORY, record observations.

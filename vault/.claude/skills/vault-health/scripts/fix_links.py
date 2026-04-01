@@ -69,7 +69,7 @@ PROJECT_CLIENT_MAP = {
 
 # Pattern F: Stub/concept links that won't become files → remove wikilink
 STUB_LINKS = {
-    "craftsmanship", "ai-philosophy", "quality", "second-brain", "telegram-bot",
+    "craftsmanship", "ai-philosophy", "quality", "life-pilot", "telegram-bot",
     "note", "title", "frontend-design", "accessibility", "vault-processor",
     "wikilinks", "sample-stub-link",
 }

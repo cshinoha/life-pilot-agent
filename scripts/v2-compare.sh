@@ -4,7 +4,7 @@
 
 DATE=${1:-$(date +%Y-%m-%d)}
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
-V1_LOG="/var/log/d-brain-cron.log"
+V1_LOG="/var/log/life-pilot-cron.log"
 V2_LOG="$PROJECT_DIR/logs/process-v2.log"
 
 echo "Comparison for $DATE"

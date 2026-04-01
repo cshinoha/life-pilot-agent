@@ -13,9 +13,9 @@ from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from d_brain.config import get_settings
-from d_brain.services.git import VaultGit
-from d_brain.services.processor import ClaudeProcessor
+from life_pilot.config import get_settings
+from life_pilot.services.git import VaultGit
+from life_pilot.services.processor import ClaudeProcessor
 
 logging.basicConfig(
     level=logging.INFO,

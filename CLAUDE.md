@@ -1,4 +1,4 @@
-# Agent Second Brain
+# Life Pilot Agent
 
 Персональный AI-ассистент для захвата мыслей, голосовых заметок и управления задачами через Telegram. Интегрируется с Claude AI, Obsidian (хранение заметок) и Todoist (задачи). Целевая аудитория — один пользователь (владелец).
 
@@ -19,7 +19,7 @@
 ## Архитектура
 
 ```
-src/d_brain/
+src/life_pilot/
 ├── __main__.py              # Точка входа
 ├── config.py                # Pydantic Settings из .env
 ├── bot/
@@ -77,7 +77,7 @@ vault/                       # Obsidian vault
 ├── templates/               # Шаблоны заметок
 ├── MEMORY.md                # Долгосрочная память (курируется вручную)
 └── .claude/                 # Конфиг Claude для обработки vault
-    ├── skills/              # dbrain-processor, graph-builder, todoist-ai
+    ├── skills/              # life-pilot-processor, graph-builder, todoist-ai
     ├── rules/               # Форматы: daily, thoughts, goals, telegram-report
     └── CLAUDE.md            # Системные инструкции для Claude внутри vault
 ```
@@ -125,7 +125,7 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 - Любая задача больше 50 строк кода — сначала план, потом код. Без явного ОК от пользователя код не писать
 - План должен описывать: какие файлы затрагиваются, что меняется, почему именно так
 - Большие задачи разбивай на подзадачи и делегируй субагентам. Основной контекст держи чистым — только планирование и координация.
-- Для диагностики проблем используй `sudo journalctl -u d-brain.service --tail 100`. Анализируй логи перед предложением фикса.
+- Для диагностики проблем используй `sudo journalctl -u life-pilot.service --tail 100`. Анализируй логи перед предложением фикса.
 - После каждого фикса — докажи что работает. Напиши тест или покажи результат. Без доказательства фикс не считается завершённым.
 - После исправления бага — обнови этот CLAUDE.md, добавь ошибку в раздел "Известные проблемы".
 
@@ -252,19 +252,19 @@ uv sync                  # Установить зависимости
 
 ```bash
 # Локально
-uv run python -m d_brain
+uv run python -m life_pilot
 
 # Через systemd (продакшен)
-sudo systemctl enable --now d-brain.service
-sudo systemctl enable --now d-brain-process.timer   # Обработка в 21:00
-sudo systemctl enable --now d-brain-weekly.timer     # Недельный дайджест
+sudo systemctl enable --now life-pilot.service
+sudo systemctl enable --now life-pilot-process.timer   # Обработка в 21:00
+sudo systemctl enable --now life-pilot-weekly.timer     # Недельный дайджест
 ```
 
 ### Логи
 
 ```bash
-sudo journalctl -u d-brain.service -f
-sudo journalctl -u d-brain-process -f
+sudo journalctl -u life-pilot.service -f
+sudo journalctl -u life-pilot-process -f
 ```
 
 ### Линтинг и тесты

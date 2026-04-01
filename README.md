@@ -167,7 +167,7 @@ Every AI action (task creation, goal update, vault write) comes with an Undo but
 ### Project Structure
 
 ```
-src/d_brain/
+src/life_pilot/
 ├── __main__.py              # Entry point
 ├── config.py                # Pydantic Settings from .env
 ├── bot/
@@ -279,23 +279,23 @@ Fill in the files in `vault/goals/`:
 uv sync
 
 # Run locally
-uv run python -m d_brain
+uv run python -m life_pilot
 
 # Or deploy with systemd (production)
 sudo cp deploy/*.service deploy/*.timer /etc/systemd/system/
-sudo systemctl enable --now d-brain-bot.service
-sudo systemctl enable --now d-brain-process.timer    # Evening processing at 21:00
-sudo systemctl enable --now d-brain-weekly.timer      # Weekly digest
+sudo systemctl enable --now life-pilot-bot.service
+sudo systemctl enable --now life-pilot-process.timer    # Evening processing at 21:00
+sudo systemctl enable --now life-pilot-weekly.timer      # Weekly digest
 ```
 
 ### 4. Customize Schedule
 
-All report and coaching times are configured in `src/d_brain/bot/main.py` via `create_scheduler()`. Adjust to your rhythm:
+All report and coaching times are configured in `src/life_pilot/bot/main.py` via `create_scheduler()`. Adjust to your rhythm:
 
 | Event | Default time | What to change |
 |---|---|---|
 | Morning plan | 08:00 | `send_morning_plan` cron hour |
-| Evening processing | 21:00 | `d-brain-process.timer` or scheduler job |
+| Evening processing | 21:00 | `life-pilot-process.timer` or scheduler job |
 | Weekly GROW coaching | Saturday 21:00 | `scheduled_grow_weekly` cron day/hour |
 | Monthly GROW coaching | 1st of month 21:00 | `scheduled_grow_monthly` cron day/hour |
 | Vault healthcheck | Wed + Sun 22:00 | `healthcheck` scheduler job |
@@ -304,7 +304,7 @@ All report and coaching times are configured in `src/d_brain/bot/main.py` via `c
 
 ```bash
 # Check bot is running
-sudo journalctl -u d-brain-bot -f
+sudo journalctl -u life-pilot-bot -f
 
 # Run linters
 uv run ruff check src/
@@ -326,4 +326,4 @@ Created by a practicing psychologist who builds AI tools for personal developmen
 
 ## Credits
 
-Inspired by [smixs/agent-second-brain](https://github.com/smixs/agent-second-brain). Built with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [MCP Protocol](https://modelcontextprotocol.io/).
+Inspired by [smixs/life-pilot](https://github.com/smixs/life-pilot). Built with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [MCP Protocol](https://modelcontextprotocol.io/).

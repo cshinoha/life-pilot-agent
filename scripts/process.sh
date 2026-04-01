@@ -27,7 +27,7 @@ CHAT_ID="${ALLOWED_USER_IDS//[\[\]]/}"  # remove brackets from [123456]
 
 cd "$PROJECT_DIR"  # MCP configured for project root
 
-echo "=== d-brain processing for $TODAY ==="
+echo "=== life-pilot processing for $TODAY ==="
 
 # ── ORIENT: skip if daily is empty ──
 DAILY_FILE="$VAULT_DIR/daily/$TODAY.md"
@@ -50,7 +50,7 @@ fi
 # Run Claude with --dangerously-skip-permissions and MCP
 REPORT=$(claude --print --dangerously-skip-permissions \
     --mcp-config "$PROJECT_DIR/mcp-config.json" \
-    -p "Today is $TODAY. Execute daily processing according to dbrain-processor skill." \
+    -p "Today is $TODAY. Execute daily processing according to life-pilot-processor skill." \
     2>&1) || true
 
 echo "=== Claude output ==="

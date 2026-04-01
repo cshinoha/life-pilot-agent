@@ -72,7 +72,7 @@ Weekly file MUST contain ONE Big Thing:
 > [Single most important outcome]
 ```
 
-This is read by dbrain-processor for context.
+This is read by life-pilot-processor for context.
 
 ## Goal Limits
 

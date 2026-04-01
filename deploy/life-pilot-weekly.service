@@ -1,0 +1,12 @@
+[Unit]
+Description=life-pilot Weekly Digest
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/life-pilot-agent
+ExecStart=/home/ubuntu/.local/bin/uv run python scripts/weekly.py
+EnvironmentFile=/home/ubuntu/life-pilot-agent/.env
+StandardOutput=journal
+StandardError=journal

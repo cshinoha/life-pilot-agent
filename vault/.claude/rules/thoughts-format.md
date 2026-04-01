@@ -67,7 +67,7 @@ Use hierarchical tags:
 #type/learning
 #topic/ai
 #topic/productivity
-#project/d-brain
+#project/life-pilot
 #status/active
 ```
 

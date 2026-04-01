@@ -34,7 +34,7 @@ Analyze vault link structure and build meaningful connections between notes.
 ## Trigger
 
 - `/graph` -- manual run
-- After `dbrain-processor` in chain (optional)
+- After `life-pilot-processor` in chain (optional)
 - Weekly: full rebuild
 
 ---
@@ -211,4 +211,4 @@ Check MOC files:
 ## Relevant Skills
 
 - [[vault/.claude/skills/vault-health/SKILL|vault-health]] -- Health scoring, MOC generation, link repair (depends on this skill)
-- [[vault/.claude/skills/dbrain-processor/SKILL|dbrain-processor]] -- Daily entry processing
+- [[vault/.claude/skills/life-pilot-processor/SKILL|life-pilot-processor]] -- Daily entry processing

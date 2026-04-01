@@ -8,8 +8,8 @@ import os; sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__fil
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from d_brain.config import get_settings
-from d_brain.services.processor import ClaudeProcessor
+from life_pilot.config import get_settings
+from life_pilot.services.processor import ClaudeProcessor
 
 
 async def send_weekly_report():

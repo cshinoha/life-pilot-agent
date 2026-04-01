@@ -1,13 +1,13 @@
 ---
 type: note
-title: Arscontexta Patterns for dbrain
+title: Arscontexta Patterns for life-pilot
 last_accessed: 2026-02-19
 relevance: 0.88
 tier: warm
 ---
-# Arscontexta Patterns for dbrain
+# Arscontexta Patterns for life-pilot
 
-Паттерны из [arscontexta](https://github.com/agenticnotetaking/arscontexta), адаптированные для dbrain vault.
+Паттерны из [arscontexta](https://github.com/agenticnotetaking/arscontexta), адаптированные для life-pilot vault.
 
 ## Source
 
@@ -40,7 +40,7 @@ JSON handoff между фазами. Fallback на монолит при оши
 
 **Реализация:**
 - `handoff.md` → `## Observations` (friction/pattern/idea)
-- dbrain-processor Step 11: автоматический capture
+- life-pilot-processor Step 11: автоматический capture
 - Weekly reflection: анализ observations → proposals
 
 ### 4. Description as Retrieval Filter
@@ -79,7 +79,7 @@ Dataview сохранён для Obsidian UX.
 
 | Pattern | Why not |
 |---------|---------|
-| Three-space restructure (self/notes/ops) | dbrain already has functional equivalent |
+| Three-space restructure (self/notes/ops) | life-pilot already has functional equivalent |
 | Full 6Rs pipeline | 6 Claude calls too expensive for automated daily pipeline |
 | PostToolUse hooks (schema validation) | analyze.py on rebuild sufficient for 655 files |
 | Per-claim task queue (ops/queue/) | Todoist is our task manager |
@@ -89,9 +89,9 @@ Dataview сохранён для Obsidian UX.
 
 ## 8 Architectural Dimensions
 
-arscontexta projects each system onto 8 axes. dbrain position:
+arscontexta projects each system onto 8 axes. life-pilot position:
 
-| Axis | dbrain | Notes |
+| Axis | life-pilot | Notes |
 |------|--------|-------|
 | Granularity | Mixed | CRM=entity (coarse), thoughts=atomic |
 | Organization | Hierarchical | 3 domains with _index.md hubs |

@@ -1,0 +1,15 @@
+[Unit]
+Description=life-pilot Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/life-pilot-agent
+ExecStart=/home/ubuntu/.local/bin/uv run python -m life_pilot
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
