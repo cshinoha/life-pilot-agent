@@ -30,7 +30,7 @@ All notable changes to this project will be documented in this file.
 - Weekly GROW skips days 1-3 of month (monthly GROW priority)
 - GROW draft deduplication on resume after restart
 
-## [2.0.0] -- 2026-04-01
+## [2.0.0] - 2026-04-01
 
 ### Added
 - Free Chat mode (Chat button) -- direct conversation with Claude
@@ -49,12 +49,12 @@ All notable changes to this project will be documented in this file.
 - Positioning: "AI Life Assistant" not just a bot
 - README rewritten with full feature documentation
 
-## [1.1.0] -- 2026-03-01
+## [1.1.0] - 2026-03-01
 
 - Coach Mode with conversation history
 - Process Goals integration in GROW
 - Scheduler conflict resolution (monthly vs weekly GROW)
 
-## [1.0.0] -- 2026-02-15
+## [1.0.0] - 2026-02-15
 
 - Initial release: voice capture, daily processing, GROW protocol, Todoist/Calendar integration

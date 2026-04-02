@@ -214,6 +214,7 @@ src/life_pilot/
     ├── session.py           # SessionStorage (JSONL logging)
     ├── todoist.py           # TodoistService (REST API)
     ├── vault_search.py      # Vault search with morphology
+    ├── claude_runner.py     # Claude CLI subprocess runner
     ├── calendar_integration.py  # Google Calendar sync
     └── git.py               # Auto-commit & push
 

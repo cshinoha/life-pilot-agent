@@ -676,12 +676,11 @@ wheels = [
 
 [[package]]
 name = "life-pilot-agent"
-version = "2.0.0"
+version = "2.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiogram" },
     { name = "apscheduler" },
-    { name = "deepgram-sdk" },
     { name = "google-api-python-client" },
     { name = "google-auth" },
     { name = "httpx" },
@@ -699,6 +698,9 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "ruff" },
 ]
+legacy = [
+    { name = "deepgram-sdk" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -712,7 +714,7 @@ dev = [
 requires-dist = [
     { name = "aiogram", specifier = ">=3.0" },
     { name = "apscheduler", specifier = ">=3.10" },
-    { name = "deepgram-sdk" },
+    { name = "deepgram-sdk", marker = "extra == 'legacy'" },
     { name = "google-api-python-client", specifier = ">=2.0" },
     { name = "google-auth", specifier = ">=2.0" },
     { name = "httpx" },
@@ -726,7 +728,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "todoist-api-python", specifier = ">=3.1.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["legacy", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

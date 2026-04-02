@@ -4,7 +4,7 @@ version = "2.1.0"
 description = "AI life assistant — captures thoughts, manages tasks, coaches you, and holds free-form conversations via Telegram"
 readme = "README.md"
 authors = [
-    { name = "Your Name", email = "your@email.com" }
+    { name = "Victor Danci", email = "mixshima@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
