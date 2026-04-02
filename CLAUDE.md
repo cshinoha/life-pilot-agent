@@ -8,7 +8,7 @@
 - **Менеджер пакетов:** uv (astral.sh)
 - **Фреймворк:** aiogram 3.0+ (async Telegram bot)
 - **Конфигурация:** pydantic 2.0+ / pydantic-settings (.env)
-- **Транскрипция:** Deepgram SDK (модель nova-3, русский)
+- **Транскрипция:** Groq Whisper API (модель whisper-large-v3-turbo)
 - **Задачи:** todoist-api-python 3.1.0+
 - **HTTP:** httpx (async)
 - **AI:** Claude Code CLI (вызов через subprocess)
@@ -53,7 +53,7 @@ src/life_pilot/
 │       ├── forward.py       # Пересланные сообщения
 │       └── buttons.py       # Обработка кнопок клавиатуры
 └── services/
-    ├── transcription.py     # DeepgramTranscriber (voice→text)
+    ├── transcription.py     # GroqWhisperTranscriber (voice→text)
     ├── storage.py           # VaultStorage (daily markdown файлы)
     ├── processor.py         # ClaudeProcessor (subprocess → claude CLI)
     ├── factory.py           # Singleton factories (get_processor, get_runner, get_todoist, get_git)
@@ -116,7 +116,7 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 ### Именование
 
 - Модули и переменные — snake_case
-- Классы — PascalCase (DeepgramTranscriber, VaultStorage, ClaudeProcessor)
+- Классы — PascalCase (GroqWhisperTranscriber, VaultStorage, ClaudeProcessor)
 - Хендлеры — функции с префиксом по типу: `cmd_start`, `handle_voice`, `handle_text`
 - Роутеры — по одному на файл хендлера, экспорт через `router = Router()`
 
@@ -172,7 +172,7 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 ### Free Chat (bot/handlers/chat.py)
 Прямой диалог с Claude без протоколов. Кнопка "💬 Чат" запускает FSM-сессию:
 - `ChatStates.chatting` — свободный диалог, история сообщений в памяти
-- Голосовые сообщения поддерживаются (транскрипция через Deepgram)
+- Голосовые сообщения поддерживаются (транскрипция через Groq Whisper)
 - Контекст vault и coaching_context.md доступны Claude
 - "стоп" или "выход" завершает сессию
 - В отличие от Coach Mode — нет zoom-кнопок и предложения сохранить инсайты
@@ -194,7 +194,7 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 ## Известные проблемы
 
 - **MemoryStorage FSM** — состояние /do теряется при рестарте бота. Для продакшена нужен Redis/PostgreSQL storage
-- **Нет rate-limiting** — ни для Telegram API, ни для Deepgram, ни для Todoist (Claude subprocess имеет asyncio Lock + очередь до 2)
+- **Нет rate-limiting** — ни для Telegram API, ни для Groq, ни для Todoist (Claude subprocess имеет asyncio Lock + очередь до 2)
 - **Нет i18n** — весь интерфейс только на русском
 - **Todoist-ошибки не блокируют обработку** — задача может не создаться, но процесс завершится успешно
 - **Нет мониторинга** — если бот упал, узнаем только когда пользователь заметит
@@ -208,7 +208,7 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 
 ### Исправлено (2026-02-28, GSD inventory fixes)
 
-- **~~Deepgram захардкожен на русский~~** — теперь через `TRANSCRIPTION_LANGUAGE` в .env (default: ru)
+- **~~Transcription language захардкожен на русский~~** — теперь через `TRANSCRIPTION_LANGUAGE` в .env (default: ru)
 - **~~Ошибки Claude subprocess raw~~** — sanitize через `_sanitize_error()`, пользователь видит friendly messages
 - **~~Git push молча падал~~** — теперь возвращает `(bool, reason)`, пользователь видит warning при ошибке sync
 - **~~Claude timeout захардкожен 1200s~~** — теперь через `CLAUDE_TIMEOUT` в .env
@@ -221,19 +221,21 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 - Ubuntu 22.04 VPS
 - Python 3.12+, Node.js 20+, Git
 - Claude Code CLI (`claude`)
-- API-ключи: TELEGRAM_BOT_TOKEN, DEEPGRAM_API_KEY, TODOIST_API_KEY
+- API-ключи: TELEGRAM_BOT_TOKEN, GROQ_API_KEY, TODOIST_API_KEY
 
 ### Переменные окружения (.env)
 
 ```
 TELEGRAM_BOT_TOKEN=      # От @BotFather
-DEEPGRAM_API_KEY=        # Транскрипция голоса
+GROQ_API_KEY=            # Транскрипция голоса (Groq Whisper)
 TODOIST_API_KEY=         # Управление задачами
 VAULT_PATH=./vault       # Путь к Obsidian vault
 ALLOWED_USER_IDS=[123]   # JSON-массив разрешённых Telegram ID
 GIT_PUSH_ENABLED=true    # Автопуш в GitHub
 CLAUDE_TIMEOUT=1200      # Таймаут subprocess в секундах (default: 1200)
-TRANSCRIPTION_LANGUAGE=ru  # Язык транскрипции Deepgram (default: ru)
+TRANSCRIPTION_LANGUAGE=ru  # Язык транскрипции Whisper (default: ru)
+COACH_MODEL=             # Модель Claude для коуча (default: claude-opus-4-5)
+TIMEZONE=Europe/Kyiv     # Таймзона APScheduler (default: Europe/Kyiv)
 ```
 
 ### Установка

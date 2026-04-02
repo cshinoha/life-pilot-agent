@@ -45,8 +45,25 @@ class VaultGit:
             logger.info("No changes to commit")
             return False
 
-        # Stage all changes
-        add_result = self._run_git("add", "-A")
+        # Stage vault content only (never .env or other sensitive files)
+        paths_to_add = [
+            "daily/",
+            "goals/",
+            "thoughts/",
+            "reflections/",
+            "summaries/",
+            "attachments/",
+            "sessions/",
+            "templates/",
+            "MEMORY.md",
+            ".obsidian/",
+        ]
+        existing = [p for p in paths_to_add if (self.vault_path / p).exists()]
+        if not existing:
+            logger.info("No tracked paths exist, nothing to stage")
+            return False
+
+        add_result = self._run_git("add", *existing)
         if add_result.returncode != 0:
             logger.error("Git add failed: %s", add_result.stderr)
             return False
@@ -74,6 +91,29 @@ class VaultGit:
 
         logger.info("Pushed to remote")
         return True, ""
+
+    def get_head_sha(self) -> str:
+        """Get current HEAD commit SHA."""
+        result = self._run_git("rev-parse", "HEAD")
+        return result.stdout.strip()
+
+    def revert_commit(self, sha: str) -> tuple[bool, str]:
+        """Revert a specific commit and push.
+
+        Args:
+            sha: Commit SHA to revert.
+
+        Returns:
+            Tuple of (success, reason).
+        """
+        result = self._run_git("revert", "--no-edit", sha)
+        if result.returncode != 0:
+            reason = result.stderr.strip() or f"exit code {result.returncode}"
+            logger.error("Git revert failed: %s", reason)
+            return False, reason
+
+        logger.info("Reverted commit %s", sha[:8])
+        return self.push()
 
     def commit_and_push(self, message: str) -> tuple[bool, str]:
         """Commit all changes and push.

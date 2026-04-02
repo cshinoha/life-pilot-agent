@@ -1,6 +1,6 @@
 [project]
 name = "life-pilot-agent"
-version = "2.0.0"
+version = "2.1.0"
 description = "AI life assistant — captures thoughts, manages tasks, coaches you, and holds free-form conversations via Telegram"
 readme = "README.md"
 authors = [
@@ -10,7 +10,6 @@ requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.0",
     "apscheduler>=3.10",
-    "deepgram-sdk",
     "httpx",
     "pydantic>=2.0",
     "pydantic-settings",
@@ -22,6 +21,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+legacy = [
+    "deepgram-sdk",
+]
 dev = [
     "pytest",
     "pytest-asyncio",

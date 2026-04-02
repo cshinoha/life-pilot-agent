@@ -1,16 +1,18 @@
-"""Free chat with Claude — conversational mode without coaching frame."""
+"""Free Chat — open-ended dialogue with Claude, no coaching frame."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from html import escape as html_escape
 
-from aiogram import Bot, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from life_pilot.bot.keyboards import get_main_keyboard
 from life_pilot.bot.progress import BusyError, run_with_progress
 from life_pilot.bot.states import ChatStates
 from life_pilot.bot.utils import send_formatted_report, transcribe_voice
@@ -20,7 +22,7 @@ router = Router(name="chat")
 logger = logging.getLogger(__name__)
 
 _STOP_RE = re.compile(
-    r"^(стоп|stop|завершить|закончить|выход|конец)[.!]?$",
+    r"^(стоп|stop|выход|exit|хватит)[.!?]?$",
     re.IGNORECASE,
 )
 
@@ -30,31 +32,62 @@ _WELCOME = (
     "Напиши <i>«стоп»</i> чтобы выйти."
 )
 
-_EXIT_MSG = "💬 Чат завершён."
-
-# Auto-exit reminder interval (minutes)
-_REMINDER_MINUTES = 15
+_TIMEOUT_SECONDS = 15 * 60  # 15 minutes
 
 
 # ---------------------------------------------------------------------------
-# Entry point (shared between /chat command and button)
+# Timeout watchdog
+# ---------------------------------------------------------------------------
+
+_timeout_tasks: dict[int, asyncio.Task[None]] = {}
+
+
+async def _timeout_watchdog(chat_id: int, state: FSMContext, bot: Bot) -> None:
+    """Auto-exit chat after inactivity."""
+    await asyncio.sleep(_TIMEOUT_SECONDS)
+    current = await state.get_state()
+    if current == ChatStates.chatting.state:
+        await state.clear()
+        await bot.send_message(
+            chat_id,
+            "💬 Чат выключен (15 мин тишины).",
+            reply_markup=get_main_keyboard(),
+        )
+
+
+def _reset_timeout(chat_id: int, state: FSMContext, bot: Bot) -> None:
+    """Cancel old timeout and start a new one."""
+    old = _timeout_tasks.pop(chat_id, None)
+    if old and not old.done():
+        old.cancel()
+    _timeout_tasks[chat_id] = asyncio.create_task(
+        _timeout_watchdog(chat_id, state, bot),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Entry points
 # ---------------------------------------------------------------------------
 
 
-async def start_chat(message: Message, state: FSMContext) -> None:
-    """Start free chat session — public helper for buttons.py."""
+async def _start_chat(message: Message, state: FSMContext, bot: Bot) -> None:
+    """Start free chat session."""
     await state.set_state(ChatStates.chatting)
-    await state.set_data({
-        "history": [],
-        "turn": 0,
-    })
+    await state.set_data({"history": [], "turn": 0})
     await message.answer(_WELCOME)
+    _reset_timeout(message.chat.id, state, bot)
 
 
 @router.message(Command("chat"))
-async def cmd_chat(message: Message, state: FSMContext) -> None:
+async def cmd_chat(message: Message, state: FSMContext, bot: Bot) -> None:
     """Start free chat via /chat command."""
-    await start_chat(message, state)
+    await _start_chat(message, state, bot)
+
+
+@router.message(F.text == "💬 Чат")
+async def btn_chat(message: Message, state: FSMContext, bot: Bot) -> None:
+    """Start free chat via keyboard button."""
+    await _start_chat(message, state, bot)
 
 
 # ---------------------------------------------------------------------------
@@ -82,68 +115,55 @@ async def handle_chat_message(
             return
         await message.answer(f"🎤 <i>{html_escape(user_text)}</i>")
     else:
-        await message.answer(
-            "Отправь текст или голосовое сообщение.",
-        )
+        await message.answer("Отправь текст или голосовое сообщение.")
         return
 
     # --- Stop trigger ---
     if _STOP_RE.match(user_text.strip()):
-        await state.clear()
-        await message.answer(_EXIT_MSG)
+        await _stop_chat(message, state)
         return
 
-    # --- Build history and send to Claude ---
+    _reset_timeout(message.chat.id, state, bot)
+
     data = await state.get_data()
     history: list[dict[str, str]] = data.get("history", [])
     history.append({"role": "user", "content": user_text})
-
-    # Build a combined prompt from history for execute_prompt
-    history_block = "\n".join(
-        f"{'User' if m['role'] == 'user' else 'Assistant'}: "
-        f"{m['content']}"
-        for m in history[:-1]
-    )
-    last_msg = history[-1]["content"]
-
-    prompt = (
-        "Ты ведёшь свободный чат с пользователем. "
-        "Отвечай дружелюбно и по делу.\n\n"
-    )
-    if history_block:
-        prompt += f"ИСТОРИЯ:\n{history_block}\n\n"
-    prompt += f"СООБЩЕНИЕ:\n{last_msg}"
 
     status_msg = await message.answer("💭")
     processor = get_processor()
     try:
         result = await run_with_progress(
-            processor.execute_prompt,
-            status_msg,
-            "💭",
-            prompt,
+            processor.chat_free, status_msg, "💭", history,
         )
     except BusyError as e:
         await status_msg.edit_text(str(e))
-        history.pop()  # rollback
+        history.pop()
         await state.update_data(history=history)
         return
 
-    # Store assistant reply (cap at 20 messages = 10 exchanges)
     assistant_text = result.get("report", "")
     history.append({"role": "assistant", "content": assistant_text})
-    if len(history) > 20:
-        history = history[-20:]
+    if len(history) > 30:
+        history = history[-30:]
 
     turn = data.get("turn", 0) + 1
     await state.update_data(history=history, turn=turn)
 
     await send_formatted_report(status_msg, result)
 
-    # Auto-exit reminder every _REMINDER_MINUTES turns worth of time
-    # Approximate: remind every 15 min worth of exchanges (~5 turns)
-    reminder_interval = max(1, _REMINDER_MINUTES // 3)
-    if turn > 0 and turn % reminder_interval == 0:
-        await message.answer(
-            "💡 <i>Напиши «стоп» чтобы завершить чат</i>",
-        )
+
+# ---------------------------------------------------------------------------
+# End session
+# ---------------------------------------------------------------------------
+
+
+async def _stop_chat(message: Message, state: FSMContext) -> None:
+    """Exit free chat mode."""
+    old = _timeout_tasks.pop(message.chat.id, None)
+    if old and not old.done():
+        old.cancel()
+    await state.clear()
+    await message.answer(
+        "💬 Чат выключен.",
+        reply_markup=get_main_keyboard(),
+    )

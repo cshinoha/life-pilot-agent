@@ -1,6 +1,6 @@
 """Button handlers for reply keyboard."""
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
@@ -17,7 +17,7 @@ async def btn_plan(message: Message) -> None:
     await cmd_plan(message)
 
 
-@router.message(F.text.in_({"⚙️ Обработать", "⚡ Обработать"}))
+@router.message(F.text == "⚡ Обработать")
 async def btn_process(message: Message, state: FSMContext) -> None:
     """Handle Process button."""
     from life_pilot.bot.handlers.process import cmd_process
@@ -33,21 +33,21 @@ async def btn_weekly(message: Message) -> None:
     await cmd_weekly(message)
 
 
-@router.message(F.text.in_({"📌 Задача", "🔍 Найти"}))
+@router.message(F.text == "🔍 Найти")
 async def btn_recall(message: Message, state: FSMContext) -> None:
-    """Handle Recall/Find button — enter search FSM."""
+    """Handle Search/Recall button — search memory."""
     from life_pilot.bot.handlers.recall import cmd_recall
 
     await cmd_recall(message, state, command=None)
 
 
-@router.message(F.text.in_({"✨ Запрос", "🤖 Сделать"}))
+@router.message(F.text == "🤖 Сделать")
 async def btn_do(message: Message, state: FSMContext) -> None:
-    """Handle Do button - set state and wait for input."""
+    """Handle AI command button - execute mode."""
     await state.set_state(DoCommandState.waiting_for_input)
     await message.answer(
-        "🎯 <b>Что сделать?</b>\n\n"
-        "Отправь голосовое или текстовое сообщение с запросом."
+        "🤖 <b>Команда для ИИ</b>\n\n"
+        "Опиши задачу или запрос (например: 'перенеси просроченные задачи', 'создай встречу на завтра')."
     )
 
 
@@ -59,12 +59,12 @@ async def btn_status(message: Message) -> None:
     await cmd_status(message)
 
 
-@router.message(F.text == "ℹ️ Помощь")
-async def btn_help(message: Message) -> None:
-    """Handle Help button."""
-    from life_pilot.bot.handlers.commands import cmd_help
+@router.message(F.text == "🤝 Коуч")
+async def btn_coach(message: Message, state: FSMContext) -> None:
+    """Handle Coach button."""
+    from life_pilot.bot.handlers.coach import cmd_coach
 
-    await cmd_help(message)
+    await cmd_coach(message, state)
 
 
 @router.message(F.text == "🏥 Здоровье")
@@ -92,8 +92,16 @@ async def btn_creative(message: Message) -> None:
 
 
 @router.message(F.text == "💬 Чат")
-async def btn_chat(message: Message, state: FSMContext) -> None:
-    """Handle Chat button — start free chat FSM."""
-    from life_pilot.bot.handlers.chat import start_chat
+async def btn_chat(message: Message, state: FSMContext, bot: Bot) -> None:
+    """Handle Chat button."""
+    from life_pilot.bot.handlers.chat import cmd_chat
 
-    await start_chat(message, state)
+    await cmd_chat(message, state, bot)
+
+
+@router.message(F.text == "ℹ️ Помощь")
+async def btn_help(message: Message) -> None:
+    """Handle Help button."""
+    from life_pilot.bot.handlers.commands import cmd_help
+
+    await cmd_help(message)

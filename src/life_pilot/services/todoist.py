@@ -85,8 +85,12 @@ class TodoistService:
 
     # ── Write ───────────────────────────────────────────────────────
 
-    def move_to_next_monday(self, task_id: str) -> bool:
-        """Reschedule task to next Monday."""
+    def move_to_next_monday(self, task_id: str) -> tuple[bool, str]:
+        """Reschedule task to next Monday.
+
+        Returns:
+            Tuple of (success, error_description). On success error is "".
+        """
         try:
             resp = requests.post(
                 f"{self.BASE_URL}/tasks/{task_id}",
@@ -94,39 +98,63 @@ class TodoistService:
                 json={"due_string": "next monday"},
                 timeout=self.timeout,
             )
-            return resp.status_code == 200
+            if resp.status_code == 200:
+                return (True, "")
+            err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.error("Todoist move failed: %s", err)
+            return (False, err)
         except Exception as e:
             logger.error("Todoist move failed: %s", e)
-            return False
+            return (False, str(e))
 
-    def delete_task(self, task_id: str) -> bool:
-        """Delete a task."""
+    def delete_task(self, task_id: str) -> tuple[bool, str]:
+        """Delete a task.
+
+        Returns:
+            Tuple of (success, error_description). On success error is "".
+        """
         try:
             resp = requests.delete(
                 f"{self.BASE_URL}/tasks/{task_id}",
                 headers=self._headers,
                 timeout=self.timeout,
             )
-            return resp.status_code == 204
+            if resp.status_code == 204:
+                return (True, "")
+            err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.error("Todoist delete failed: %s", err)
+            return (False, err)
         except Exception as e:
             logger.error("Todoist delete failed: %s", e)
-            return False
+            return (False, str(e))
 
-    def close_task(self, task_id: str) -> bool:
-        """Mark task as completed."""
+    def close_task(self, task_id: str) -> tuple[bool, str]:
+        """Mark task as completed.
+
+        Returns:
+            Tuple of (success, error_description). On success error is "".
+        """
         try:
             resp = requests.post(
                 f"{self.BASE_URL}/tasks/{task_id}/close",
                 headers=self._headers,
                 timeout=self.timeout,
             )
-            return resp.status_code == 204
+            if resp.status_code == 204:
+                return (True, "")
+            err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.error("Todoist close failed: %s", err)
+            return (False, err)
         except Exception as e:
             logger.error("Todoist close failed: %s", e)
-            return False
+            return (False, str(e))
 
-    def update_content(self, task_id: str, content: str) -> bool:
-        """Update task content (reformulation)."""
+    def update_content(self, task_id: str, content: str) -> tuple[bool, str]:
+        """Update task content (reformulation).
+
+        Returns:
+            Tuple of (success, error_description). On success error is "".
+        """
         try:
             resp = requests.post(
                 f"{self.BASE_URL}/tasks/{task_id}",
@@ -134,13 +162,21 @@ class TodoistService:
                 json={"content": content},
                 timeout=self.timeout,
             )
-            return resp.status_code == 200
+            if resp.status_code == 200:
+                return (True, "")
+            err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.error("Todoist update content failed: %s", err)
+            return (False, err)
         except Exception as e:
             logger.error("Todoist update content failed: %s", e)
-            return False
+            return (False, str(e))
 
-    def reschedule_to_today(self, task_id: str) -> bool:
-        """Reschedule a task to today."""
+    def reschedule_to_today(self, task_id: str) -> tuple[bool, str]:
+        """Reschedule a task to today.
+
+        Returns:
+            Tuple of (success, error_description). On success error is "".
+        """
         try:
             resp = requests.post(
                 f"{self.BASE_URL}/tasks/{task_id}",
@@ -148,7 +184,11 @@ class TodoistService:
                 json={"due_string": "today"},
                 timeout=self.timeout,
             )
-            return resp.status_code == 200
+            if resp.status_code == 200:
+                return (True, "")
+            err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.warning("Failed to reschedule task %s: %s", task_id, err)
+            return (False, err)
         except Exception as e:
             logger.warning("Failed to reschedule task %s: %s", task_id, e)
-            return False
+            return (False, str(e))

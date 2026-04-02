@@ -52,7 +52,7 @@ Three core principles shaped the design:
 
 ### Capture Everything
 Send anything to Telegram -- the agent figures out what to do with it:
-- **Voice messages** -> transcribed (Deepgram) -> classified -> stored or tasked
+- **Voice messages** -> transcribed (Groq Whisper, free) -> classified -> stored or tasked
 - **Text** -> parsed for tasks, ideas, learnings
 - **Photos** -> saved with context
 - **Forwarded messages** -> extracted and categorized
@@ -160,7 +160,7 @@ Every AI action (task creation, goal update, vault write) comes with an Undo but
 - **Language:** Python 3.12+
 - **Package manager:** uv (astral.sh)
 - **Telegram framework:** aiogram 3.0+ (async)
-- **Transcription:** Deepgram SDK (nova-3)
+- **Transcription:** Groq Whisper API (whisper-large-v3-turbo, free tier)
 - **Tasks:** Todoist API
 - **AI engine:** Claude Code CLI (subprocess)
 - **MCP servers:** Todoist, Google Calendar
@@ -181,6 +181,7 @@ src/life_pilot/
 │   ├── progress.py          # Async progress utility
 │   ├── utils.py             # Shared helpers
 │   ├── states.py            # FSM states (Do, Process, Monthly, Grow, Recall, Coach, Chat)
+│   ├── undo.py              # Undo system (5-min rollback window, payload cleanup)
 │   ├── components/
 │   │   └── task_keyboard.py # Reusable per-task inline keyboard
 │   └── handlers/
@@ -205,7 +206,7 @@ src/life_pilot/
 │       ├── forward.py       # Forwarded messages
 │       └── buttons.py       # Keyboard button routing
 └── services/
-    ├── transcription.py     # DeepgramTranscriber
+    ├── transcription.py     # GroqWhisperTranscriber
     ├── storage.py           # VaultStorage (daily markdown)
     ├── processor.py         # ClaudeProcessor (subprocess)
     ├── factory.py           # Singleton factories
@@ -242,7 +243,7 @@ scripts/                     # Automation (process.sh, weekly.py, send_*.py)
 | Claude Pro/Max | AI agent | $20/mo |
 | VPS (any region) | 24/7 bot hosting | ~$5/mo |
 | GitHub | Backup & sync | Free |
-| Deepgram | Voice transcription | Free ($200 credit) |
+| Groq | Voice transcription (Whisper) | Free tier |
 | Todoist | Task management | Free / $4/mo Pro |
 
 ### 1. Clone and Configure
@@ -257,13 +258,13 @@ Edit `.env` with your keys:
 
 ```env
 TELEGRAM_BOT_TOKEN=           # From @BotFather
-DEEPGRAM_API_KEY=             # console.deepgram.com
+GROQ_API_KEY=                 # console.groq.com (free tier, Whisper transcription)
 TODOIST_API_KEY=              # Todoist → Settings → Integrations
 VAULT_PATH=./vault            # Path to Obsidian vault
 ALLOWED_USER_IDS=[123456]     # Your Telegram ID (from @userinfobot)
 GIT_PUSH_ENABLED=true         # Auto-push vault changes to GitHub
 CLAUDE_TIMEOUT=1200           # Claude subprocess timeout in seconds
-TRANSCRIPTION_LANGUAGE=ru     # Deepgram language code (ru, en, etc.)
+TRANSCRIPTION_LANGUAGE=ru     # Whisper language code (ru, en, etc.)
 GOOGLE_TOKEN_PATH=~/life-pilot/token.json  # Google Calendar OAuth token
 ```
 
@@ -298,10 +299,13 @@ All report and coaching times are configured in `src/life_pilot/bot/main.py` via
 
 | Event | Default time | What to change |
 |---|---|---|
-| Morning plan | 08:00 | `send_morning_plan` cron hour |
+| Morning plan | 11:00 | `send_morning_plan` cron hour |
 | Evening processing | 21:00 | `life-pilot-process.timer` or scheduler job |
-| Weekly GROW coaching | Saturday 21:00 | `scheduled_grow_weekly` cron day/hour |
-| Monthly GROW coaching | 1st of month 21:00 | `scheduled_grow_monthly` cron day/hour |
+| Monthly report | 1st of month 20:30 | `scheduled_monthly_report` cron day/hour |
+| Weekly GROW coaching | Saturday 21:00 | `scheduled_grow_weekly` cron day/hour (skips days 1-3) |
+| Monthly GROW coaching | Days 1-3 at 21:00 | `scheduled_grow_monthly` cron day/hour |
+| Quarterly GROW coaching | Varies by quarter | `scheduled_grow_quarterly` in grow_scheduler.py |
+| Yearly GROW coaching | Dec 20/23/26, Jan 5/10 | `scheduled_grow_yearly_*` in grow_scheduler.py |
 | Vault healthcheck | Wed + Sun 22:00 | `healthcheck` scheduler job |
 
 ### 5. Verify
@@ -309,6 +313,10 @@ All report and coaching times are configured in `src/life_pilot/bot/main.py` via
 ```bash
 # Check bot is running
 sudo journalctl -u life-pilot-bot -f
+
+# Check scheduled jobs (processing, weekly digest)
+sudo journalctl -u life-pilot-process -f
+sudo journalctl -u life-pilot-weekly -f
 
 # Run linters
 uv run ruff check src/

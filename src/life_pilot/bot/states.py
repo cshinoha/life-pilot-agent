@@ -52,4 +52,10 @@ class CoachStates(StatesGroup):
 class ChatStates(StatesGroup):
     """States for free chat with Claude."""
 
-    chatting = State()    # Active free chat dialogue
+    chatting = State()  # Active free dialogue
+
+
+class WeeklyGoalsStates(StatesGroup):
+    """States for updating weekly goals from staleness prompt."""
+
+    waiting_goals = State()  # Waiting for text or voice with new weekly goals

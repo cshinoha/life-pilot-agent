@@ -51,7 +51,7 @@ Life Pilot закрывает этот разрыв:
 
 ### 📥 Захват всего подряд
 Отправляйте что угодно в Telegram — агент сам решит что с этим делать:
-- **Голосовые** → транскрипция (Deepgram) → классификация → сохранение или задача
+- **Голосовые** → транскрипция (Groq Whisper, бесплатно) → классификация → сохранение или задача
 - **Текст** → парсинг на задачи, идеи, находки
 - **Фото** → сохранение с контекстом
 - **Пересланные сообщения** → извлечение и категоризация
@@ -91,17 +91,36 @@ Life Pilot закрывает этот разрыв:
 - 3 попытки напоминания на сессию — настойчиво, но не навязчиво
 - Все рефлексии хранятся в структурированном markdown для долгосрочного самопознания
 
-### 🤖 Команды (кнопки клавиатуры)
+### Coach Mode — диалоговый коучинг
+Интерактивные сессии через кнопку "Коуч" или `/coach`:
+- Свободный диалог с Claude, заземлённый в ваших целях и контексте
+- Голосовые сообщения поддерживаются на протяжении всего разговора
+- Кнопка **Zoom In** — когда теряетесь в абстракциях, получаете конкретные следующие шаги
+- Кнопка **Zoom Out** — когда погрязли в деталях, возвращает к большой картине
+- "стоп" завершает сессию — система предлагает сохранить инсайты в vault
+- История разговора хранится до 10 обменов в сессии
 
-| Кнопка | Что делает |
+### Free Chat — прямой диалог с Claude
+Кнопка "Чат" открывает прямую линию к Claude:
+- Спрашивайте что угодно — поиск по заметкам, советы, мозговой штурм, анализ
+- Полный доступ к контексту vault и истории коучинга
+- Без жёсткого протокола — просто разговор с AI-ассистентом
+- Голосовые сообщения поддерживаются
+
+### Undo-система
+Каждое действие AI (создание задачи, обновление цели, запись в vault) сопровождается кнопкой Undo:
+- Окно отмены 5 минут для любого AI-изменения
+- Кнопка автоматически исчезает по истечении времени — не засоряет чат
+- Устаревшие Undo-пейлоады очищаются из памяти
+
+### 12 кнопок клавиатуры Telegram
+
+| Строка | Кнопки |
 |---|---|
-| ✨ Запрос | Свободный вопрос к Claude — поиск по заметкам, анализ, совет |
-| 📌 Задача | Быстрый захват задачи → Todoist |
-| ⚙️ Обработать | Запуск Claude на входящие за день — сортировка, классификация, создание задач |
-| 📋 План | Утренний брифинг: календарь + задачи + приоритеты |
-| 📅 Неделя | Недельный дайджест |
-| 📊 Статус | Текущий статус системы |
-| ❓ Помощь | Справка по командам |
+| 1 | Запрос — Задача — Обработать |
+| 2 | План — Неделя — Статус |
+| 3 | Здоровье — Память — Открытие |
+| 4 | Коуч — Чат — Помощь |
 
 ### 🔄 Интеграции через MCP
 
@@ -134,7 +153,7 @@ Life Pilot закрывает этот разрыв:
 - **Язык:** Python 3.12+
 - **Менеджер пакетов:** uv (astral.sh)
 - **Telegram-фреймворк:** aiogram 3.0+ (async)
-- **Транскрипция:** Deepgram SDK (nova-3)
+- **Транскрипция:** Groq Whisper API (whisper-large-v3-turbo, бесплатный тир)
 - **Задачи:** Todoist API
 - **AI-движок:** Claude Code CLI (subprocess)
 - **MCP-серверы:** Todoist, Google Calendar
@@ -150,29 +169,44 @@ src/life_pilot/
 ├── config.py                # Pydantic Settings из .env
 ├── bot/
 │   ├── main.py              # Инициализация бота, регистрация роутеров
-│   ├── keyboards.py         # Reply-клавиатура (7 кнопок)
+│   ├── keyboards.py         # Reply-клавиатура (12 кнопок, 4 строки)
 │   ├── formatters.py        # HTML-форматирование отчётов
 │   ├── progress.py          # Async-утилита прогресса
 │   ├── utils.py             # Общие хелперы
-│   ├── states.py            # FSM-состояния
+│   ├── states.py            # FSM-состояния (Do, Process, Monthly, Grow, Recall, Coach, Chat)
+│   ├── undo.py              # Undo-система (5-минутное окно отмены, очистка пейлоадов)
+│   ├── components/
+│   │   └── task_keyboard.py # Переиспользуемая inline-клавиатура задачи
 │   └── handlers/
 │       ├── commands.py      # /start, /help, /status, /plan
-│       ├── process.py       # ⚙️ Обработать — Claude сортирует входящие
-│       ├── do.py            # ✨ Запрос — свободные вопросы к Claude
-│       ├── weekly.py        # 📅 Недельный дайджест
-│       ├── grow.py          # 🧭 GROW-коучинг сессии (FSM)
+│       ├── process.py       # Обработать — Claude сортирует входящие
+│       ├── do.py            # Запрос — свободные вопросы к Claude
+│       ├── weekly.py        # Недельный дайджест
+│       ├── weekly_callbacks.py  # Кнопки недельного отчёта + GROW trigger
+│       ├── monthly.py       # Месячный отчёт + запланированные напоминания
+│       ├── monthly_callbacks.py # Кнопки месячного отчёта + FSM переформулировки
+│       ├── grow.py          # GROW-коучинг сессии (FSM)
 │       ├── grow_scheduler.py # Запланированные GROW-напоминания
+│       ├── coach.py         # Coach Mode FSM — диалоговый коучинг
+│       ├── chat.py          # Free Chat — прямой диалог с Claude
+│       ├── healthcheck.py   # Планировщик проверки vault (Ср+Вс 22:00)
+│       ├── reflection.py    # DEPRECATED stub — редиректит старые кнопки на GROW
+│       ├── recall.py        # /recall — поиск по vault
+│       ├── vault_tools.py   # /health, /memory, /creative — утилиты vault
 │       ├── voice.py         # Голосовые → транскрипция → хранение
-│       ├── text.py          # Текстовые сообщения (catch-all)
+│       ├── text.py          # Текстовые сообщения (catch-all, последний)
 │       ├── photo.py         # Фото-вложения
 │       ├── forward.py       # Пересланные сообщения
 │       └── buttons.py       # Маршрутизация кнопок клавиатуры
 └── services/
-    ├── transcription.py     # DeepgramTranscriber
+    ├── transcription.py     # GroqWhisperTranscriber
     ├── storage.py           # VaultStorage (daily markdown)
     ├── processor.py         # ClaudeProcessor (subprocess)
+    ├── factory.py           # Singleton factories
     ├── grow.py              # Логика GROW-сессий, банк вопросов, черновики
     ├── session.py           # SessionStorage (JSONL-логирование)
+    ├── todoist.py           # TodoistService (REST API)
+    ├── vault_search.py      # Поиск по vault с морфологией
     ├── calendar_integration.py  # Синхронизация с Google Calendar
     └── git.py               # Автокоммит и push
 
@@ -202,7 +236,7 @@ scripts/                     # Автоматизация (process.sh, weekly.py
 | Claude Pro/Max | AI-агент | $20/мес |
 | VPS (не РФ/РБ) | Бот работает 24/7 | ~$5/мес |
 | GitHub | Бэкап и синхронизация | Бесплатно |
-| Deepgram | Транскрипция голоса | Бесплатно ($200 на старт) |
+| Groq | Транскрипция голоса (Whisper) | Бесплатный тир |
 | Todoist | Управление задачами | Бесплатно / $4/мес Pro |
 
 ### 1. Клонируйте и настройте
@@ -217,11 +251,14 @@ cp .env.example .env
 
 ```env
 TELEGRAM_BOT_TOKEN=       # От @BotFather
-DEEPGRAM_API_KEY=         # console.deepgram.com
+GROQ_API_KEY=             # console.groq.com (бесплатно, транскрипция Whisper)
 TODOIST_API_KEY=          # Todoist → Settings → Integrations
 VAULT_PATH=./vault
 ALLOWED_USER_IDS=[123]    # Ваш Telegram ID (от @userinfobot)
 GIT_PUSH_ENABLED=true
+CLAUDE_TIMEOUT=1200       # Таймаут subprocess в секундах
+TRANSCRIPTION_LANGUAGE=ru # Язык Whisper (ru, en и т.д.)
+GOOGLE_TOKEN_PATH=~/life-pilot/token.json  # OAuth-токен Google Calendar
 ```
 
 ### 2. Заполните цели
@@ -251,15 +288,19 @@ sudo systemctl enable --now life-pilot-weekly.timer      # Недельный д
 
 ### 4. Настройте расписание под себя
 
-Все времена отчётов и коучинг-сессий настраиваются в `src/life_pilot/bot/main.py` → `create_scheduler()`. Таймзона по умолчанию — `Europe/Chisinau`. Настройте под свой ритм:
+Все времена отчётов и коучинг-сессий настраиваются в `src/life_pilot/bot/main.py` → `create_scheduler()`. Настройте под свой ритм:
 
 | Событие | Время по умолчанию | Что менять |
 |---|---|---|
-| Утренний план | 08:00 | cron hour в `send_morning_plan` |
+| Утренний план | 11:00 | cron hour в `send_morning_plan` |
 | Вечерняя обработка | 21:00 | `life-pilot-process.timer` или job в scheduler |
-| Недельный GROW-коучинг | Суббота 21:00 | cron day/hour в `scheduled_grow_weekly` |
-| Месячный GROW-коучинг | 1-е число 21:00 | cron day/hour в `scheduled_grow_monthly` |
-| Таймзона | Europe/Chisinau | параметр `timezone` в `create_scheduler()` |
+| Месячный отчёт | 1-е число 20:30 | cron day/hour в `scheduled_monthly_report` |
+| Недельный GROW-коучинг | Суббота 21:00 | cron day/hour в `scheduled_grow_weekly` (пропускает 1-3 числа) |
+| Месячный GROW-коучинг | 1-3 числа 21:00 | cron day/hour в `scheduled_grow_monthly` |
+| Квартальный GROW-коучинг | Варьируется | `scheduled_grow_quarterly` в grow_scheduler.py |
+| Годовой GROW-коучинг | 20/23/26 дек, 5/10 янв | `scheduled_grow_yearly_*` в grow_scheduler.py |
+| Проверка здоровья vault | Ср + Вс 22:00 | job `healthcheck` в scheduler |
+| Таймзона | Europe/Kyiv | параметр `timezone` в `create_scheduler()` |
 
 > ⚠️ **Важно:** Установите таймзону и время, которые соответствуют вашему распорядку. Система работает лучше всего, когда утренний план приходит до начала дня, а вечерний отчёт — после окончания рабочего дня.
 
@@ -268,6 +309,10 @@ sudo systemctl enable --now life-pilot-weekly.timer      # Недельный д
 ```bash
 # Логи бота
 sudo journalctl -u life-pilot-bot -f
+
+# Логи планировщиков
+sudo journalctl -u life-pilot-process -f
+sudo journalctl -u life-pilot-weekly -f
 
 # Линтеры
 uv run ruff check src/

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         description="Path to Obsidian vault directory",
     )
     google_token_path: Path = Field(
-        default=Path("~/life-pilot-agent/token.json"),
+        default=Path("~/life-pilot/token.json"),
         description="Path to Google OAuth token JSON file",
     )
     allowed_user_ids: list[int] = Field(
@@ -38,12 +38,26 @@ class Settings(BaseSettings):
     )
     transcription_language: str = Field(
         default="ru",
-        description="Deepgram transcription language (e.g. ru, en, multi)",
+        description="Transcription language (e.g. ru, en, multi)",
     )
     claude_timeout: int = Field(
         default=1200,
         description="Claude CLI subprocess timeout in seconds",
     )
+    coach_model: str = Field(
+        default="",
+        description="Claude model for coach mode (e.g. opus). Empty = default.",
+    )
+    timezone: str = Field(
+        default="Europe/Kyiv",
+        description="Timezone for scheduler and date calculations (e.g. Europe/Kyiv)",
+    )
+
+    @field_validator("vault_path", "google_token_path", mode="before")
+    @classmethod
+    def expand_home(cls, v: object) -> Path:
+        """Expand ~ in paths (not done automatically in systemd environment)."""
+        return Path(str(v)).expanduser()
 
     @property
     def daily_path(self) -> Path:
