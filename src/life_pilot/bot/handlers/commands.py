@@ -1,6 +1,7 @@
 """Command handlers for /start, /help, /status, /plan."""
 
 import asyncio
+import html
 from datetime import date
 
 from aiogram import Router
@@ -9,7 +10,7 @@ from aiogram.types import Message
 
 from life_pilot.bot.keyboards import get_main_keyboard
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_processor
+from life_pilot.services.factory import get_processor, get_runner
 from life_pilot.services.storage import VaultStorage
 
 router = Router(name="commands")
@@ -65,12 +66,22 @@ async def cmd_status(message: Message) -> None:
     """Handle /status command."""
     settings = get_settings()
     storage = VaultStorage(settings.vault_path)
+    runtime_status = get_runner().get_runtime_status(trigger_bootstrap=True)
 
     today = date.today()
     content = storage.read_daily(today)
 
+    llm_block = (
+        "\n\n🤖 <b>LLM:</b> "
+        f"{html.escape(runtime_status['summary'])}"
+    )
+    if runtime_status["details"]:
+        llm_block += f"\n{html.escape(runtime_status['details'])}"
+
     if not content:
-        await message.answer(f"📅 <b>{today}</b>\n\nЗаписей пока нет.")
+        await message.answer(
+            f"📅 <b>{today}</b>\n\nЗаписей пока нет.{llm_block}"
+        )
         return
 
     lines = content.strip().split("\n")
@@ -90,6 +101,7 @@ async def cmd_status(message: Message) -> None:
         f"- 💬 Текстовых: {text_count}\n"
         f"- 📷 Фото: {photo_count}\n"
         f"- ↩️ Пересланных: {forward_count}"
+        f"{llm_block}"
     )
 
 @router.message(Command("plan"))

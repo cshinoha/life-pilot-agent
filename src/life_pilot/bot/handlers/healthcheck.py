@@ -7,6 +7,7 @@ from datetime import date, datetime
 from aiogram import Bot
 
 from life_pilot.config import get_settings
+from life_pilot.services.factory import get_runner
 from life_pilot.services.storage import VaultStorage
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ async def scheduled_healthcheck(bot: Bot, chat_id: int) -> None:
     """Send daily health status at 09:00."""
     settings = get_settings()
     storage = VaultStorage(settings.vault_path)
+    runtime_status = get_runner().get_runtime_status(trigger_bootstrap=False)
 
     today = date.today()
     yesterday = date.fromordinal(today.toordinal() - 1)
@@ -40,6 +42,7 @@ async def scheduled_healthcheck(bot: Bot, chat_id: int) -> None:
         "✅ <b>Бот работает</b>\n\n"
         f"📅 Вчера: {entry_count} записей\n"
         f"📊 GROW: {grow_status}\n"
+        f"🤖 LLM: {runtime_status['summary']}\n"
         f"⏰ {datetime.now().strftime('%H:%M')} · {today.isoformat()}"
     )
 

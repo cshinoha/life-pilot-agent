@@ -43,7 +43,11 @@ def get_runner() -> ClaudeRunner:
     from life_pilot.services.claude_runner import ClaudeRunner
 
     return ClaudeRunner(
-        settings.vault_path, settings.todoist_api_key, settings.claude_timeout,
+        settings.vault_path,
+        settings.todoist_api_key,
+        settings.claude_timeout,
+        settings.llm_cli,
+        settings.llm_model,
     )
 
 

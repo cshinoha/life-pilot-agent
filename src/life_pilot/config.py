@@ -42,11 +42,19 @@ class Settings(BaseSettings):
     )
     claude_timeout: int = Field(
         default=1200,
-        description="Claude CLI subprocess timeout in seconds",
+        description="LLM CLI subprocess timeout in seconds",
+    )
+    llm_cli: str = Field(
+        default="codex",
+        description="LLM CLI binary to use (codex or claude)",
+    )
+    llm_model: str = Field(
+        default="",
+        description="Default model passed to LLM CLI. Empty = CLI default.",
     )
     coach_model: str = Field(
         default="",
-        description="Claude model for coach mode (e.g. opus). Empty = default.",
+        description="Model override for coach mode. Empty = default model.",
     )
     timezone: str = Field(
         default="Europe/Kyiv",

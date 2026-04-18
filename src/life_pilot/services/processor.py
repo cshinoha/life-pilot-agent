@@ -26,10 +26,17 @@ class ClaudeProcessor:
         self, vault_path: Path, todoist_api_key: str = "",
         coach_model: str = "",
     ) -> None:
+        settings = get_settings()
         self.vault_path = Path(vault_path)
         self.todoist_api_key = todoist_api_key
         self.coach_model = coach_model
-        self.runner = ClaudeRunner(vault_path, todoist_api_key)
+        self.runner = ClaudeRunner(
+            vault_path,
+            todoist_api_key,
+            settings.claude_timeout,
+            settings.llm_cli,
+            settings.llm_model,
+        )
         self.todoist: TodoistService | None = (
             TodoistService(todoist_api_key) if todoist_api_key else None
         )
