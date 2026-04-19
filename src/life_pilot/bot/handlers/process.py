@@ -17,6 +17,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from life_pilot.bot.formatters import format_process_report
 from life_pilot.bot.progress import BusyError, run_with_progress
 from life_pilot.bot.states import ProcessStates
 from life_pilot.bot.undo import register_undo, schedule_button_removal
@@ -64,7 +65,7 @@ async def _send_report_with_correction(
     commit_sha: str = "",
 ) -> None:
     """Send report and add correction + undo keyboard. Save report in FSM state."""
-    formatted = report.get("report", report.get("error", ""))
+    formatted = format_process_report(report)
     try:
         await status_msg.edit_text(formatted)
     except Exception:

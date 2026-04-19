@@ -12,6 +12,7 @@ def sanitize_telegram_html(text: str) -> str:
     """Sanitize HTML for Telegram, keeping only allowed tags.
 
     Telegram supports: <b>, <i>, <code>, <pre>, <a>, <s>, <u>
+    Unsupported tags are stripped; <br> becomes a newline.
 
     Args:
         text: Raw HTML text from Claude
@@ -22,8 +23,16 @@ def sanitize_telegram_html(text: str) -> str:
     if not text:
         return ""
 
-    # First, escape any raw < > that are not part of tags
-    # This regex matches < or > not followed/preceded by tag patterns
+    # Normalize common line-break / block tags before stripping the rest.
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"</?(?:p|div|li|section|article)\b[^>]*>",
+        "\n",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Preserve allowed tags, strip unsupported ones, and escape stray angle brackets.
     result = []
     i = 0
     while i < len(text):
@@ -35,13 +44,9 @@ def sanitize_telegram_html(text: str) -> str:
                 if tag_name in ALLOWED_TAGS:
                     # Keep the allowed tag
                     result.append(tag_match.group(0))
-                    i += len(tag_match.group(0))
-                    continue
-                else:
-                    # Escape disallowed tag
-                    result.append("&lt;")
-                    i += 1
-                    continue
+                # Strip disallowed tags entirely.
+                i += len(tag_match.group(0))
+                continue
             else:
                 # Not a valid tag pattern, escape
                 result.append("&lt;")
