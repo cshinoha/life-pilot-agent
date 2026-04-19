@@ -74,13 +74,12 @@ class ClaudeRunner:
     """Runs LLM CLI (Codex or Claude) as a subprocess."""
 
     def __init__(
-        self, vault_path: Path, todoist_api_key: str = "",
+        self, vault_path: Path,
         timeout: int = DEFAULT_TIMEOUT,
         llm_cli: str = "codex",
         default_model: str = "",
     ) -> None:
         self.vault_path = Path(vault_path).resolve()
-        self.todoist_api_key = todoist_api_key
         self.timeout = timeout
         self.llm_cli = llm_cli.strip().lower() or "codex"
         self.default_model = default_model.strip()
@@ -443,8 +442,6 @@ class ClaudeRunner:
         output_path = ""
         try:
             env = os.environ.copy()
-            if self.todoist_api_key:
-                env["TODOIST_API_KEY"] = self.todoist_api_key
 
             output_file = tempfile.NamedTemporaryFile(
                 mode="w", suffix=".txt", delete=False,
@@ -545,11 +542,11 @@ class ClaudeRunner:
             return skill_path.read_text()
         return ""
 
-    def load_todoist_reference(self) -> str:
-        """Load Todoist reference for inclusion in prompt."""
+    def load_tasknotes_reference(self) -> str:
+        """Load TaskNotes reference for inclusion in prompt."""
         ref_path = (
             self.vault_path
-            / ".claude/skills/life-pilot-processor/references/todoist.md"
+            / ".claude/skills/life-pilot-processor/references/tasknotes.md"
         )
         if ref_path.exists():
             return ref_path.read_text()

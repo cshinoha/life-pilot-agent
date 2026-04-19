@@ -9,18 +9,29 @@ import random
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_runner, get_todoist
+from life_pilot.services.factory import get_runner, get_tasknotes
 
 logger = logging.getLogger(__name__)
+
+type Question = dict[str, str]
+type Questions = list[Question]
+type AnswerValue = str | list[str]
+type Answers = dict[str, AnswerValue]
+type GrowDraft = dict[str, Any]
+type GrowStateEntry = dict[str, str | int]
+type GrowState = dict[str, GrowStateEntry]
+type ProcessGoal = dict[str, str]
+type ProcessGoals = list[ProcessGoal]
+type AnalysisResult = dict[str, Any]
 
 # ---------------------------------------------------------------------------
 # Question bank — all questions VERBATIM
 # ---------------------------------------------------------------------------
 
-QUESTION_BANK: dict[str, list[dict[str, str]]] = {
+QUESTION_BANK: dict[str, Questions] = {
     "weekly": [
         # GOAL
         {
@@ -362,19 +373,19 @@ def get_period_for_session(session_type: str) -> str:
 # State persistence
 # ---------------------------------------------------------------------------
 
-def load_grow_state(vault_path: Path) -> dict:
+def load_grow_state(vault_path: Path) -> GrowState:
     """Load .grow_state.json from vault root. Returns empty dict if missing."""
     state_file = vault_path / ".grow_state.json"
     if not state_file.exists():
         return {}
     try:
-        return json.loads(state_file.read_text(encoding="utf-8"))
+        return cast(GrowState, json.loads(state_file.read_text(encoding="utf-8")))
     except Exception:
         logger.warning("Failed to parse .grow_state.json, returning empty state")
         return {}
 
 
-def save_grow_state(vault_path: Path, state: dict) -> None:
+def save_grow_state(vault_path: Path, state: GrowState) -> None:
     """Save .grow_state.json to vault root."""
     state_file = vault_path / ".grow_state.json"
     state_file.write_text(
@@ -397,7 +408,10 @@ def is_reflection_done(session_type: str, period: str, vault_path: Path) -> bool
 # ---------------------------------------------------------------------------
 
 def save_draft(
-    session_type: str, period: str, data: dict, vault_path: Path
+    session_type: str,
+    period: str,
+    data: GrowDraft,
+    vault_path: Path,
 ) -> Path:
     """Save a JSON draft to vault/reflections/{session_type}/{period}.draft.md."""
     draft_dir = vault_path / "reflections" / session_type
@@ -412,13 +426,13 @@ def save_draft(
 
 def load_draft(
     session_type: str, period: str, vault_path: Path
-) -> dict | None:
+) -> GrowDraft | None:
     """Load draft if it exists. Returns parsed dict or None."""
     draft_path = vault_path / "reflections" / session_type / f"{period}.draft.md"
     if not draft_path.exists():
         return None
     try:
-        return json.loads(draft_path.read_text(encoding="utf-8"))
+        return cast(GrowDraft, json.loads(draft_path.read_text(encoding="utf-8")))
     except Exception:
         logger.warning("Failed to parse draft %s", draft_path)
         return None
@@ -436,7 +450,7 @@ def delete_draft(
 
 def find_latest_draft(
     session_type: str, vault_path: Path
-) -> tuple[str, dict] | None:
+) -> tuple[str, GrowDraft] | None:
     """Find most recent draft for session_type, regardless of period.
 
     Returns (period, data) or None. Used to resume drafts when the date may
@@ -454,7 +468,7 @@ def find_latest_draft(
         return None
     period = drafts[0].stem.removesuffix(".draft")
     try:
-        data = json.loads(drafts[0].read_text(encoding="utf-8"))
+        data = cast(GrowDraft, json.loads(drafts[0].read_text(encoding="utf-8")))
         return period, data
     except Exception:
         logger.warning("Failed to parse draft %s", drafts[0])
@@ -496,7 +510,7 @@ def get_previous_reflections(
 def collect_grow_context(session_type: str, vault_path: Path) -> str:
     """Collect context for Claude question-selection prompt.
 
-    Reads goals, Todoist tasks, previous reflections, and (for weekly)
+    Reads goals, task notes, previous reflections, and (for weekly)
     recent daily notes.
     """
     sections: list[str] = []
@@ -513,32 +527,29 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
     else:
         sections.append(f"=== GOALS ({goal_rel}) === [file not found]")
 
-    # 2. Todoist tasks
-    todoist = get_todoist()
-    if todoist is not None:
-        try:
-            tasks = todoist.fetch_active_tasks()
-            today_str = date.today().isoformat()
-            overdue = [
-                t for t in tasks
-                if t.get("due")
-                and t["due"].get("date")
-                and t["due"]["date"] < today_str
-            ]
-            total = len(tasks)
-            overdue_count = len(overdue)
-            overdue_names = ", ".join(t.get("content", "?") for t in overdue[:5])
-            sections.append(
-                f"=== TODOIST ===\n"
-                f"Active tasks: {total}\n"
-                f"Overdue: {overdue_count}\n"
-                f"Overdue tasks: {overdue_names or 'none'}"
-            )
-        except Exception:
-            logger.warning("Failed to fetch Todoist tasks for GROW context")
-            sections.append("=== TODOIST === [fetch failed]")
-    else:
-        sections.append("=== TODOIST === [not configured]")
+    # 2. TaskNotes tasks
+    tasknotes = get_tasknotes()
+    try:
+        tasks = tasknotes.fetch_active_tasks()
+        today_str = date.today().isoformat()
+        overdue = [
+            t for t in tasks
+            if t.get("due")
+            and t["due"].get("date")
+            and t["due"]["date"] < today_str
+        ]
+        total = len(tasks)
+        overdue_count = len(overdue)
+        overdue_names = ", ".join(t.get("content", "?") for t in overdue[:5])
+        sections.append(
+            f"=== TASKS ===\n"
+            f"Active tasks: {total}\n"
+            f"Overdue: {overdue_count}\n"
+            f"Overdue tasks: {overdue_names or 'none'}"
+        )
+    except Exception:
+        logger.warning("Failed to fetch TaskNotes tasks for GROW context")
+        sections.append("=== TASKS === [fetch failed]")
 
     # 3. Previous reflections
     prev = get_previous_reflections(session_type, vault_path, limit=4)
@@ -572,7 +583,7 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
 # Claude call #1: select questions
 # ---------------------------------------------------------------------------
 
-async def select_questions(session_type: str) -> list[dict]:
+async def select_questions(session_type: str) -> Questions:
     """Use Claude to select the most relevant questions for the session."""
     settings = get_settings()
     vault_path = settings.vault_path
@@ -633,7 +644,7 @@ CRITICAL OUTPUT FORMAT: Верни ТОЛЬКО валидный JSON, без ma
         if isinstance(parsed, list) and all(
             isinstance(q, dict) and "id" in q and "text" in q for q in parsed
         ):
-            return parsed
+            return cast(Questions, parsed)
         logger.warning("Claude returned unexpected structure, using fallback")
         return _fallback_random_selection(session_type)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -641,7 +652,7 @@ CRITICAL OUTPUT FORMAT: Верни ТОЛЬКО валидный JSON, без ma
         return _fallback_random_selection(session_type)
 
 
-def _fallback_random_selection(session_type: str) -> list[dict]:
+def _fallback_random_selection(session_type: str) -> Questions:
     """Randomly pick questions from the bank if Claude call fails."""
     bank = QUESTION_BANK.get(session_type, [])
     min_q, max_q = QUESTION_COUNT.get(session_type, (2, 3))
@@ -655,10 +666,10 @@ def _fallback_random_selection(session_type: str) -> list[dict]:
 
 async def analyze_answers(
     session_type: str,
-    questions: list[dict],
-    answers: dict,
+    questions: Questions,
+    answers: Answers,
     correction: str | None = None,
-) -> dict:
+) -> AnalysisResult:
     """Use Claude to produce a summary and optional goal updates."""
     settings = get_settings()
     vault_path = settings.vault_path
@@ -750,7 +761,7 @@ CRITICAL OUTPUT FORMAT:
     try:
         parsed = _parse_json(raw)
         if isinstance(parsed, dict) and "summary" in parsed:
-            return parsed
+            return cast(AnalysisResult, parsed)
         logger.warning("Claude returned unexpected structure for analysis")
         return {"summary": raw, "goal_updates": None}
     except (json.JSONDecodeError, ValueError):
@@ -764,7 +775,7 @@ CRITICAL OUTPUT FORMAT:
 
 
 def _update_coaching_context(
-    process_goals: list[dict],
+    process_goals: ProcessGoals,
     session_type: str,
     period: str,
     vault_path: Path,
@@ -827,10 +838,10 @@ def finalize_reflection(
     session_type: str,
     period: str,
     summary: str,
-    questions: list[dict],
-    answers: dict,
+    questions: Questions,
+    answers: Answers,
     vault_path: Path,
-    process_goals: list[dict] | None = None,
+    process_goals: ProcessGoals | None = None,
 ) -> Path:
     """Convert draft to final markdown with YAML frontmatter.
 

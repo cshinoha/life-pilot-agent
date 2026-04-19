@@ -14,7 +14,7 @@ from aiogram.types import CallbackQuery, InaccessibleMessage, Message
 from life_pilot.bot.components.task_keyboard import handle_task_action
 from life_pilot.bot.states import MonthlyStates
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_todoist
+from life_pilot.services.factory import get_tasknotes
 
 router = Router(name="monthly_callbacks")
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ async def handle_reformulate_start(callback: CallbackQuery, state: FSMContext) -
 
 @router.message(MonthlyStates.waiting_reformulation)
 async def handle_reformulation_input(message: Message, state: FSMContext) -> None:
-    """Receive new task wording and update in Todoist."""
+    """Receive new task wording and update the TaskNotes file."""
     if message.text and message.text.startswith("/"):
         await state.clear()
         return
@@ -103,13 +103,10 @@ async def handle_reformulation_input(message: Message, state: FSMContext) -> Non
 
     await state.clear()
 
-    todoist = get_todoist()
-    if not todoist:
-        await message.answer("❌ Todoist API key не настроен")
-        return
+    tasknotes = get_tasknotes()
 
-    success = await asyncio.to_thread(
-        todoist.update_content, task_id, new_content,
+    success, error = await asyncio.to_thread(
+        tasknotes.update_content, task_id, new_content,
     )
     if success:
         await message.answer(
@@ -119,7 +116,7 @@ async def handle_reformulation_input(message: Message, state: FSMContext) -> Non
         settings = get_settings()
         _set_monthly_processed(settings.vault_path)
     else:
-        await message.answer("❌ Ошибка при обращении к Todoist")
+        await message.answer(f"❌ {error or 'Ошибка при обновлении задачи'}")
 
 
 # ── Legacy goal handlers (unchanged) ─────────────────────────────────

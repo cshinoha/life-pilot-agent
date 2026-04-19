@@ -64,6 +64,9 @@ async def transcribe_voice(bot: Bot, message: "Message") -> str | None:
     api_key = settings.groq_api_key or settings.deepgram_api_key
     transcriber = GroqTranscriber(api_key, settings.transcription_language)
     try:
+        if message.voice is None:
+            await message.answer("❌ Голосовое сообщение не найдено")
+            return None
         audio_bytes, _ = await download_telegram_file(
             bot, message.voice.file_id
         )

@@ -2,8 +2,10 @@
 
 import json
 import os
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytz
 
@@ -36,12 +38,16 @@ def get_calendar_events(
     if not token_path.exists():
         raise FileNotFoundError(f"Token not found: {token_path}")
 
-    from google.oauth2.credentials import Credentials  # type: ignore[import-untyped]
+    from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build  # type: ignore[import-untyped]
 
     with open(token_path) as f:
-        creds_data = json.load(f)
-    creds = Credentials.from_authorized_user_info(creds_data)
+        creds_data = cast(dict[str, Any], json.load(f))
+    from_authorized_user_info = cast(
+        Callable[[dict[str, Any]], Credentials],
+        Credentials.from_authorized_user_info,
+    )
+    creds = from_authorized_user_info(creds_data)
 
     service = build('calendar', 'v3', credentials=creds)
     

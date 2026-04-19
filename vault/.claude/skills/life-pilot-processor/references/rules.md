@@ -19,22 +19,22 @@ Check AFTER each `## HH:MM` header for the marker.
 
 ## Rule 2: Every Task = Date
 
-**NEVER create a task without `dueString`:**
+**NEVER create a task without a `due` date when a date can be inferred:**
 
-| Text | dueString |
-|------|-----------|
-| завтра | tomorrow |
-| в пятницу | friday |
-| на этой неделе | friday |
-| в четверг | thursday |
-| 15 января | January 15 |
-| NOT SPECIFIED | in 3 days |
+| Text | due |
+|------|-----|
+| завтра | tomorrow's ISO date |
+| в пятницу | this Friday's ISO date |
+| на этой неделе | this Friday's ISO date |
+| в четверг | this Thursday's ISO date |
+| 15 января | exact ISO date |
+| NOT SPECIFIED | today + 3 days |
 
 ## Rule 3: Check Duplicates
 
 **BEFORE creating any task:**
 
-1. Call `find-tasks` with key words from task
+1. Read active task notes and search by title/keywords
 2. If similar task exists → **DO NOT CREATE**
 3. Mark as: `<!-- ✓ processed: task (duplicate) -->`
 
@@ -42,7 +42,7 @@ Check AFTER each `## HH:MM` header for the marker.
 
 **BEFORE creating tasks:**
 
-1. Call `find-tasks-by-date` with `startDate: "today"`, `daysCount: 7`
+1. Read active task notes with due dates in the next 7 days
 2. Count tasks per day
 3. If target day has 3+ tasks → shift to next day with less load
 
@@ -56,7 +56,7 @@ After EACH processed entry, add marker:
 
 For tasks with details:
 ```markdown
-<!-- ✓ processed: task → Todoist: {name} {priority} {date} -->
+<!-- ✓ processed: task → TaskNotes: {name} {priority} {date} -->
 ```
 
 ## Rule 6: Apply Decision Filters
@@ -84,7 +84,7 @@ See [ABOUT.md](ABOUT.md) → Anti-Patterns section.
 ## Checklist Before Completion
 
 - [ ] All new entries processed
-- [ ] No duplicates in Todoist
+- [ ] No duplicates in TaskNotes
 - [ ] All tasks have dates and concrete actions
 - [ ] Decision filters applied
 - [ ] Anti-patterns avoided

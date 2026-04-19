@@ -30,3 +30,4 @@ token.json
 .obsidian/
 .codex-device-auth.json
 .codex-device-auth.log
+.opencode/

@@ -1,6 +1,6 @@
 # Life Pilot Agent
 
-Персональный AI-ассистент для захвата мыслей, голосовых заметок и управления задачами через Telegram. Интегрируется с Claude AI, Obsidian (хранение заметок) и Todoist (задачи). Целевая аудитория — один пользователь (владелец).
+Персональный AI-ассистент для захвата мыслей, голосовых заметок и управления задачами через Telegram. Интегрируется с Claude AI, Obsidian (хранение заметок) и TaskNotes-совместимыми markdown-задачами внутри vault. Целевая аудитория — один пользователь (владелец).
 
 ## Стек
 
@@ -9,10 +9,10 @@
 - **Фреймворк:** aiogram 3.0+ (async Telegram bot)
 - **Конфигурация:** pydantic 2.0+ / pydantic-settings (.env)
 - **Транскрипция:** Groq Whisper API (модель whisper-large-v3-turbo)
-- **Задачи:** todoist-api-python 3.1.0+
+- **Задачи:** TaskNotes markdown notes внутри Obsidian vault
 - **HTTP:** httpx (async)
 - **AI:** Claude Code CLI (вызов через subprocess)
-- **MCP-серверы:** Todoist (`@doist/todoist-ai`), Google Calendar (`@modelcontextprotocol/server-google-calendar`)
+- **MCP-серверы:** Google Calendar (`@modelcontextprotocol/server-google-calendar`)
 - **Хранение:** файловая система (Obsidian vault, markdown + JSONL сессии)
 - **Деплой:** systemd на Ubuntu VPS
 
@@ -56,11 +56,11 @@ src/life_pilot/
     ├── transcription.py     # GroqWhisperTranscriber (voice→text)
     ├── storage.py           # VaultStorage (daily markdown файлы)
     ├── processor.py         # ClaudeProcessor (subprocess → claude CLI)
-    ├── factory.py           # Singleton factories (get_processor, get_runner, get_todoist, get_git)
+    ├── factory.py           # Singleton factories (get_processor, get_runner, get_tasknotes, get_git)
     ├── grow.py              # GROW protocol: question bank, Claude prompts, draft/finalize, update_goals
     ├── session.py           # SessionStorage (JSONL-логирование)
     ├── git.py               # VaultGit (auto-commit/push)
-    ├── todoist.py           # TodoistService (REST API v1)
+    ├── tasknotes.py         # TaskNotesService (markdown task files)
     ├── vault_search.py      # search_vault (grep + Russian morphology)
     └── calendar_integration.py  # Google Calendar MCP интеграция
 ```
@@ -77,7 +77,7 @@ vault/                       # Obsidian vault
 ├── templates/               # Шаблоны заметок
 ├── MEMORY.md                # Долгосрочная память (курируется вручную)
 └── .claude/                 # Конфиг Claude для обработки vault
-    ├── skills/              # life-pilot-processor, graph-builder, todoist-ai
+    ├── skills/              # life-pilot-processor, graph-builder
     ├── rules/               # Форматы: daily, thoughts, goals, telegram-report
     └── CLAUDE.md            # Системные инструкции для Claude внутри vault
 ```
@@ -194,9 +194,9 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 ## Известные проблемы
 
 - **MemoryStorage FSM** — состояние /do теряется при рестарте бота. Для продакшена нужен Redis/PostgreSQL storage
-- **Нет rate-limiting** — ни для Telegram API, ни для Groq, ни для Todoist (Claude subprocess имеет asyncio Lock + очередь до 2)
+- **Нет rate-limiting** — ни для Telegram API, ни для Groq, ни для операций с vault-задачами (Claude subprocess имеет asyncio Lock + очередь до 2)
 - **Нет i18n** — весь интерфейс только на русском
-- **Todoist-ошибки не блокируют обработку** — задача может не создаться, но процесс завершится успешно
+- **Ошибки TaskNotes/file-операций не всегда блокируют обработку** — задача может не сохраниться, но процесс завершится успешно
 - **Нет мониторинга** — если бот упал, узнаем только когда пользователь заметит
 - **Claude = SPOF** — если Claude CLI недоступен, все AI-фичи не работают
 
@@ -221,14 +221,14 @@ commands → process → weekly → weekly_callbacks → monthly → monthly_cal
 - Ubuntu 22.04 VPS
 - Python 3.12+, Node.js 20+, Git
 - Claude Code CLI (`claude`)
-- API-ключи: TELEGRAM_BOT_TOKEN, GROQ_API_KEY, TODOIST_API_KEY
+- API-ключи: TELEGRAM_BOT_TOKEN, GROQ_API_KEY
 
 ### Переменные окружения (.env)
 
 ```
 TELEGRAM_BOT_TOKEN=      # От @BotFather
 GROQ_API_KEY=            # Транскрипция голоса (Groq Whisper)
-TODOIST_API_KEY=         # Управление задачами
+TASKNOTES_DIR=TaskNotes/Tasks  # Относительный путь для markdown-задач
 VAULT_PATH=./vault       # Путь к Obsidian vault
 ALLOWED_USER_IDS=[123]   # JSON-массив разрешённых Telegram ID
 GIT_PUSH_ENABLED=true    # Автопуш в GitHub

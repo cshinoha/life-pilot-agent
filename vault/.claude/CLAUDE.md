@@ -62,6 +62,7 @@ Help user stay aligned with goals, capture valuable insights, and maintain clari
 | `daily/` | Raw daily entries (YYYY-MM-DD.md) |
 | `goals/` | Goal cascade (3y → yearly → monthly → weekly) |
 | `thoughts/` | Processed notes by category |
+| `TaskNotes/` | Markdown task notes |
 | `MOC/` | Maps of Content indexes |
 | `attachments/` | Photos by date |
 | `business/` | Business data (CRM, network, events) |
@@ -122,7 +123,7 @@ Run daily processing via `/process` command or automatically at 21:00.
 
 ### 3-Phase Pipeline:
 1. **CAPTURE** — Read daily entries → classify → JSON
-2. **EXECUTE** — Create Todoist tasks, save thoughts, update CRM → JSON
+2. **EXECUTE** — Create TaskNotes task files, save thoughts, update CRM → JSON
 3. **REFLECT** — Generate HTML report, update MEMORY, record observations
 
 Each phase = fresh Claude context for better quality.
@@ -166,13 +167,11 @@ tier: active
 | `graph-builder` | Vault link analysis and building |
 | `vault-health` | Health scoring, MOC generation, link repair |
 | `agent-memory` | Card template, decay engine, tiered search |
-| `todoist-ai` | Todoist task management via MCP |
 
 - **Processing:** `.claude/skills/life-pilot-processor/SKILL.md`
 - **Graph Builder:** `.claude/skills/graph-builder/SKILL.md`
 - **Vault Health:** `.claude/skills/vault-health/SKILL.md`
 - **Agent Memory:** `.claude/skills/agent-memory/SKILL.md`
-- **Todoist:** `.claude/skills/todoist-ai/SKILL.md`
 - **Rules:** `.claude/rules/` (daily, thoughts, goals, obsidian-markdown, weekly-reflection)
 - **Docs:** `.claude/docs/`
 
@@ -223,17 +222,16 @@ See `.claude/rules/` for format requirements:
 
 ## MCP Servers
 
-- `todoist` — Task management (add, find, complete tasks)
 - `google-calendar` — Calendar events and scheduling
 
 ## CRITICAL: Tool Usage Policy
 
-**ТЫ ОБЯЗАН ВЫЗЫВАТЬ MCP TOOLS НАПРЯМУЮ.**
+**Для задач ты обязан работать напрямую с файлами vault.**
 
-Не существует ситуации, когда MCP tools "недоступны". Если ты получил эту инструкцию — у тебя есть доступ к:
+Не существует ситуации, когда "TaskNotes недоступен". Если ты получил эту инструкцию — у тебя есть доступ к:
 
-- `mcp__todoist__*` — все Todoist операции
 - File read/write — все файловые операции
+- `mcp__google-calendar__*` — календарные операции
 
 ЗАПРЕЩЁННЫЕ ПАТТЕРНЫ (НИКОГДА не делай это):
 - "MCP недоступен в текущем режиме"
@@ -242,21 +240,20 @@ See `.claude/rules/` for format requirements:
 - Любые инструкции для ручного выполнения
 
 ПРАВИЛЬНЫЙ ПАТТЕРН:
-1. Вызвать mcp__todoist__add-tasks tool
-2. Получить результат (успех или ошибка)
+1. Прочитать существующие task notes в `TaskNotes/Tasks/`
+2. Создать или обновить markdown task file напрямую
 3. Включить результат в HTML отчёт
 
-При ошибке — показать ТОЧНУЮ ошибку от tool, не придумывать отговорки.
+При ошибке — показать ТОЧНУЮ ошибку файловой операции, не придумывать отговорки.
 
-## MCP Tools Available
+## Task Store Available
 
-**Todoist (mcp__todoist__*):**
-- `add-tasks` — создать задачи
-- `find-tasks` — найти задачи по тексту
-- `find-tasks-by-date` — задачи за период
-- `update-tasks` — изменить задачи
-- `complete-tasks` — завершить задачи
-- `user-info` — информация о пользователе
+**TaskNotes (`TaskNotes/Tasks/*.md`):**
+- create — создать новую markdown-задачу с frontmatter
+- read — найти задачи по title/status/due
+- update — изменить title, due, priority, status
+- complete — поставить `status: done` и `completed`
+- delete — удалить markdown-файл задачи
 
 ## Report Format
 

@@ -97,7 +97,7 @@ async def _finalize_processing(
     day: date,
     state: FSMContext,
 ) -> None:
-    """Run process_daily_finalize, commit, and send report with correction/undo keyboard."""
+    """Run finalize flow, commit changes, and send correction/undo UI."""
     processor = get_processor()
     git = get_git()
 
@@ -398,7 +398,7 @@ async def handle_correction_input(
 Пользователь просит внести правки:
 {prompt_text}
 
-Скорректируй отчёт с учётом правок и обнови данные в Todoist/vault если нужно.
+Скорректируй отчёт с учётом правок и обнови данные в TaskNotes/vault если нужно.
 
 CRITICAL OUTPUT FORMAT:
 - Return ONLY raw HTML for Telegram (parse_mode=HTML)

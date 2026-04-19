@@ -47,7 +47,8 @@ async def btn_do(message: Message, state: FSMContext) -> None:
     await state.set_state(DoCommandState.waiting_for_input)
     await message.answer(
         "🤖 <b>Команда для ИИ</b>\n\n"
-        "Опиши задачу или запрос (например: 'перенеси просроченные задачи', 'создай встречу на завтра')."
+        "Опиши задачу или запрос (например: 'перенеси просроченные задачи', "
+        "'создай встречу на завтра')."
     )
 
 

@@ -45,7 +45,6 @@ def create_dispatcher() -> Dispatcher:
         weekly,
         weekly_callbacks,
     )
-
     from life_pilot.bot.undo import router as undo_router
 
     # Use memory storage for FSM (required for /do command state)

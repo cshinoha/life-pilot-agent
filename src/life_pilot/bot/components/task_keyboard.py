@@ -1,4 +1,4 @@
-"""Reusable per-task inline keyboard with Todoist action handling."""
+"""Reusable per-task inline keyboard with TaskNotes action handling."""
 
 import asyncio
 import logging
@@ -6,7 +6,7 @@ import logging
 from aiogram.types import CallbackQuery, InaccessibleMessage, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from life_pilot.services.factory import get_todoist
+from life_pilot.services.factory import get_tasknotes
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def create_task_keyboard(
     """Build an inline keyboard for a single task.
 
     Args:
-        task_id: Todoist task ID (used in callback_data).
+        task_id: Task note ID (used in callback_data).
         context: 'weekly' or 'monthly' — determines button set.
 
     Returns:
@@ -66,7 +66,7 @@ async def handle_task_action(callback: CallbackQuery) -> None:
     """Universal handler for task action callbacks.
 
     Parses ``{context}_{action}_{task_id}`` from callback.data,
-    calls appropriate Todoist API, and replaces message keyboard
+    calls the appropriate TaskNotes update, and replaces message keyboard
     with a confirmation text.
 
     Debounce: asyncio.Lock per task_id prevents double execution.
@@ -108,29 +108,25 @@ async def handle_task_action(callback: CallbackQuery) -> None:
         if msg is None or isinstance(msg, InaccessibleMessage):
             return
 
-        todoist = get_todoist()
-        if not todoist:
-            await callback.answer(
-                "❌ Todoist API key не настроен", show_alert=True,
-            )
-            return
+        tasknotes = get_tasknotes()
 
         success = False
+        error = ""
         confirm_text = ""
 
         if action == "move":
-            success = await asyncio.to_thread(
-                todoist.move_to_next_monday, task_id,
+            success, error = await asyncio.to_thread(
+                tasknotes.move_to_next_monday, task_id,
             )
             confirm_text = "📅 Перенесено на следующий понедельник"
         elif action == "delete":
-            success = await asyncio.to_thread(
-                todoist.delete_task, task_id,
+            success, error = await asyncio.to_thread(
+                tasknotes.delete_task, task_id,
             )
             confirm_text = "🗑 Задача удалена"
         elif action == "done":
-            success = await asyncio.to_thread(
-                todoist.close_task, task_id,
+            success, error = await asyncio.to_thread(
+                tasknotes.close_task, task_id,
             )
             confirm_text = "✅ Задача выполнена"
 
@@ -142,5 +138,5 @@ async def handle_task_action(callback: CallbackQuery) -> None:
             )
         else:
             await callback.answer(
-                "❌ Ошибка при обращении к Todoist", show_alert=True,
+                f"❌ {error or 'Ошибка при обновлении задачи'}", show_alert=True,
             )

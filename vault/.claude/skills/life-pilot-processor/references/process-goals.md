@@ -81,11 +81,11 @@ When generating Process Commitments for ONE Big Thing:
 1. **Ask:** What daily/weekly habits would make this inevitable?
 2. **Limit:** 3-5 process commitments max
 3. **Prioritize:** Time blocks > Frequency > Checkpoints
-4. **Create:** Recurring tasks in Todoist with appropriate patterns
+4. **Create:** Active task notes in TaskNotes with appropriate next dates
 
-## Recurring Task Patterns
+## Scheduling Patterns
 
-Map process goals to Todoist dueString:
+Map process goals to TaskNotes `due` dates:
 
 | Process | dueString |
 |---------|-----------|

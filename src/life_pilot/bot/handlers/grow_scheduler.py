@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
@@ -24,6 +25,7 @@ from life_pilot.services.grow import (
 logger = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS = 3
+GrowState = dict[str, dict[str, str | int]]
 
 
 def _now_iso() -> str:
@@ -51,7 +53,7 @@ def _build_resume_keyboard(
 
 
 def _resolve_attempt(
-    state: dict,
+    state: GrowState,
     session_type: str,
     period: str,
 ) -> int:
@@ -61,17 +63,18 @@ def _resolve_attempt(
     calls). Returns _MAX_ATTEMPTS + 1 if the maximum has already been reached.
     """
     entry = state.get(session_type, {})
-    if entry.get("period") == period and isinstance(entry.get("attempt"), int):
-        return entry["attempt"] + 1
+    attempt = entry.get("attempt")
+    if entry.get("period") == period and isinstance(attempt, int):
+        return attempt + 1
     return 1
 
 
 def _save_attempt(
-    state: dict,
+    state: GrowState,
     session_type: str,
     period: str,
     attempt: int,
-    vault_path,
+    vault_path: Path,
 ) -> None:
     """Persist the updated attempt counter into .grow_state.json."""
     state[session_type] = {
@@ -499,7 +502,7 @@ async def scheduled_grow_yearly_start(bot: Bot, chat_id: int) -> None:
 
 
 async def scheduled_daily_plan(bot: Bot, chat_id: int) -> None:
-    """Send the daily plan generated from calendar and Todoist data."""
+    """Send the daily plan generated from calendar and TaskNotes data."""
     logger.info("Scheduled daily plan starting")
     processor = get_processor()
 
@@ -508,7 +511,10 @@ async def scheduled_daily_plan(bot: Bot, chat_id: int) -> None:
     except Exception as e:
         logger.error("Scheduled daily plan failed: %s", e)
         try:
-            await bot.send_message(chat_id, f"⚠️ Не удалось сформировать план на день: {e}")
+            await bot.send_message(
+                chat_id,
+                f"⚠️ Не удалось сформировать план на день: {e}",
+            )
         except Exception:
             logger.exception("Failed to send daily plan error message")
         return

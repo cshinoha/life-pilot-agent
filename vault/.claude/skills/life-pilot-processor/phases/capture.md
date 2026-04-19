@@ -19,7 +19,7 @@ Read daily entries, classify them, and output structured JSON.
 
 1. Read `daily/{DATE}.md`
 2. For each entry (## HH:MM [type] block), classify:
-   - **task** — actionable item → will become Todoist task
+   - **task** — actionable item → will become TaskNotes task file
    - **idea** → will be saved to thoughts/ideas/
    - **reflection** → thoughts/reflections/
    - **learning** → thoughts/learnings/

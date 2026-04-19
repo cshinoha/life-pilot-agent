@@ -32,7 +32,10 @@ class GroqTranscriber:
         Raises:
             Exception: If transcription fails
         """
-        logger.info("Starting Groq transcription, audio size: %d bytes", len(audio_bytes))
+        logger.info(
+            "Starting Groq transcription, audio size: %d bytes",
+            len(audio_bytes),
+        )
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -48,7 +51,11 @@ class GroqTranscriber:
 
         if response.status_code != 200:
             error_msg = response.text[:300]
-            logger.error("Groq transcription failed (%d): %s", response.status_code, error_msg)
+            logger.error(
+                "Groq transcription failed (%d): %s",
+                response.status_code,
+                error_msg,
+            )
             raise RuntimeError(f"Groq transcription failed: {error_msg}")
 
         transcript = response.text.strip()

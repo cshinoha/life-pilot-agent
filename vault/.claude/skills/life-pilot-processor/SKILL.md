@@ -1,16 +1,16 @@
 ---
 type: note
-description: Personal assistant for processing daily voice/text entries from Telegram. Classifies content, creates Todoist tasks aligned with goals, saves thoughts to Obsidian with wiki-links, generates HTML reports. Integrates Your Business context (clients, projects, CRM). Triggers on /process command or daily 21:00 cron.
+description: Personal assistant for processing daily voice/text entries from Telegram. Classifies content, creates TaskNotes task files aligned with goals, saves thoughts to Obsidian with wiki-links, generates HTML reports. Integrates Your Business context (clients, projects, CRM). Triggers on /process command or daily 21:00 cron.
 last_accessed: 2026-02-26
 relevance: 0.98
 tier: active
 name: life-pilot-processor
-depends_on: [graph-builder, todoist-ai, agent-memory, vault-health]
+depends_on: [graph-builder, agent-memory, vault-health]
 ---
 
 # Life Pilot Processor
 
-Process daily entries → tasks (Todoist) + thoughts (Obsidian) + HTML report (Telegram).
+Process daily entries → tasks (TaskNotes) + thoughts (Obsidian) + HTML report (Telegram).
 
 Integrates with Your Business data for business context.
 
@@ -34,36 +34,34 @@ WRONG:
 CORRECT:
 <b>Title</b>
 
-## MCP Tools Required
+## TaskNotes Task Files
 
-mcp__todoist__add-tasks — Create tasks
-mcp__todoist__find-tasks — Check duplicates
-mcp__todoist__find-tasks-by-date — Check workload
+Все задачи живут как markdown notes в `TaskNotes/Tasks/` внутри vault.
 
-## CRITICAL: MCP Tool Usage
+Минимальный frontmatter для новой задачи:
+- `title`
+- `status: open`
+- `due: YYYY-MM-DD`
+- `priority: p1|p2|p3|p4`
+- `created: YYYY-MM-DDTHH:MM:SS`
+- optional: `projects`, `contexts`, `source`
 
-**НИКАКИХ WORKAROUNDS. НИКАКИХ "добавь вручную". ТОЛЬКО ПРЯМЫЕ ВЫЗОВЫ.**
+## CRITICAL: File-Based Task Workflow
 
-У тебя ЕСТЬ доступ к MCP tools:
-- `mcp__todoist__add-tasks`
-- `mcp__todoist__find-tasks`
-- `mcp__todoist__find-tasks-by-date`
-- `mcp__todoist__complete-tasks`
-- `mcp__todoist__update-tasks`
+**НИКАКИХ WORKAROUNDS. НИКАКИХ "добавь вручную". РАБОТАЙ НАПРЯМУЮ С ФАЙЛАМИ VAULT.**
 
 ЗАПРЕЩЕНО:
-- Писать "MCP недоступен"
-- Предлагать "добавь вручную"
-- Использовать subprocess для вызова CLI
-- Делать HTTP запросы к API напрямую
-- Выводить команды для копирования
+- Упоминать Todoist или MCP
+- Предлагать ручное добавление
+- Делать HTTP запросы к API задач
+- Выводить shell-команды для копирования
 
 ОБЯЗАТЕЛЬНО:
-- Вызывать `mcp__todoist__add-tasks` tool напрямую
-- Если tool вернул ошибку — включить её в отчёт
-- Если task создан — включить task ID в отчёт
-
-При ошибке MCP tool — показать ТОЧНУЮ ошибку от tool, не придумывать отговорки.
+- Читать существующие task notes перед созданием новой задачи
+- Не создавать дубликаты активных задач
+- Ставить due в ISO-формате `YYYY-MM-DD`
+- Если task note создан — включить path или task ID в отчёт
+- Если файловая операция не удалась — включить точную ошибку в отчёт
 
 ## Processing Flow
 
@@ -72,8 +70,8 @@ mcp__todoist__find-tasks-by-date — Check workload
    - Read `business/_index.md` — Your Business (клиенты, проекты, CRM)
    - Read `projects/_index.md` — личные проекты (если релевантно)
 3. **Read daily** — daily/YYYY-MM-DD.md
-4. **Check workload** — `mcp__todoist__find-tasks-by-date` with startDate=today, daysCount=7
-5. **CHECK PROCESS GOALS** — `mcp__todoist__find-tasks` with labels=["process-goal"]
+4. **Check workload** — read active task notes due in the next 7 days
+5. **CHECK PROCESS GOALS** — inspect task notes with `contexts: [process-goal]`
    → If empty or stale: generate from goals, create recurring tasks
 6. **Process entries** — Classify → task or thought, detect business mentions
 7. **Build links** — Connect notes with [[wiki-links]], link to business entities
@@ -98,7 +96,7 @@ mcp__todoist__find-tasks-by-date — Check workload
 **Что логировать:**
 - Создание файлов в thoughts/
 - Обновление business/ или projects/
-- Создание задач в Todoist (с task ID)
+- Создание task notes (с path или task ID)
 - Синхронизация с внешними системами
 
 **Пример:**
@@ -223,7 +221,7 @@ Append в `vault/.session/handoff.md` секцию `## Observations`:
 
 ```markdown
 ## Observations
-- [friction] YYYY-MM-DD: mcp__todoist timeout 3x — retry спас, но -60 сек
+- [friction] YYYY-MM-DD: task note write failed once — retry succeeded
 - [pattern] YYYY-MM-DD: daily без entries 2 дня подряд — выходные?
 - [idea] YYYY-MM-DD: CRM карточки без deal_deadline = невидимые дедлайны
 ```
@@ -241,7 +239,7 @@ Append в `vault/.session/handoff.md` секцию `## Observations`:
 
 ```html
 <b>👁 Observations:</b>
-• [friction] mcp__todoist timeout 3x
+• [friction] task note write failed once
 ```
 
 ---
@@ -252,7 +250,7 @@ Append в `vault/.session/handoff.md` секцию `## Observations`:
 
 ### 1. Проверь существующие process goals
 
-Call `mcp__todoist__find-tasks` with labels=["process-goal"], limit=20.
+Read active task notes in `TaskNotes/Tasks/` and find notes with `contexts: [process-goal]` or `projects: [process-goals]`.
 
 ### 2. Если process goals ОТСУТСТВУЮТ — создай их
 
@@ -264,12 +262,11 @@ Call `mcp__todoist__find-tasks` with labels=["process-goal"], limit=20.
 | Monthly Top 3 | goals/2-monthly.md | 1 action/день на приоритет |
 | Yearly Focus | goals/1-yearly-*.md | 30 мин/день на стратегию |
 
-**Создай recurring tasks:**
+**Создай process-goal task notes:**
 
-Call `mcp__todoist__add-tasks` with tasks:
-- "2h deep work: [ONE Big Thing]" — dueString: "every weekday at 6am", priority: 2, labels: ["process-goal"]
-- "1 outreach/день: [monthly priority]" — dueString: "every weekday", priority: 3, labels: ["process-goal"]
-- "30 мин продуктовые идеи" — dueString: "every day", priority: 4, labels: ["process-goal"]
+- "2h deep work: [ONE Big Thing]" — priority: p2, contexts: [process-goal], due: ближайший рабочий день
+- "1 outreach/день: [monthly priority]" — priority: p3, contexts: [process-goal], due: завтра
+- "30 мин продуктовые идеи" — priority: p4, contexts: [process-goal], due: завтра
 
 **Лимит:** Max 5-7 активных process goals.
 
@@ -353,7 +350,7 @@ business/
 
 ## Classification
 
-task → Todoist (see references/todoist.md)
+task → TaskNotes (see references/tasknotes.md)
 idea/reflection/learning → thoughts/ (see references/classification.md)
 client/project mention → link to Business/Projects + create task if actionable
 
@@ -363,7 +360,7 @@ USER: [Your name], [your profession], prefers direct Russian communication
 
 ### Speech Patterns
 
-**Tasks (создавать в Todoist):**
+**Tasks (создавать в TaskNotes):**
 - Starts with: "надо", "нужно", "срочно", "так", "сделать"
 - Multiple actions in one sentence → SPLIT into separate tasks
 - Example: "надо заполнить канал и поговорить с визионером" → 2 tasks
@@ -600,7 +597,7 @@ Max length: 4096 characters.
 Read these files as needed:
 - references/about.md — User profile, decision filters
 - references/classification.md — Entry classification rules
-- references/todoist.md — Task creation details + recurring patterns
+- references/tasknotes.md — Task file format + scheduling patterns
 - references/goals.md — Goal alignment logic
 - references/process-goals.md — Process vs outcome goals, transformation patterns
 - references/links.md — Wiki-links building
@@ -637,4 +634,4 @@ grep -l "priority: High" business/crm/
 ## Relevant Skills
 
 - [[vault/.claude/skills/graph-builder/SKILL|graph-builder]] — Vault graph analysis
-- [[vault/.claude/skills/todoist-ai/SKILL|todoist-ai]] — Todoist task management
+- [[vault/.claude/skills/graph-builder/SKILL|graph-builder]] — use when linking tasks to business entities
