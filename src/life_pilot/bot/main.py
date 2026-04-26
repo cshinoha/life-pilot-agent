@@ -31,6 +31,7 @@ def create_dispatcher() -> Dispatcher:
         coach,
         commands,
         do,
+        dpv_routine,
         forward,
         grow,
         monthly,
@@ -64,6 +65,7 @@ def create_dispatcher() -> Dispatcher:
     dp.include_router(do.router)  # Before voice/text to catch FSM state
     dp.include_router(coach.router)  # Coach Mode FSM — before buttons/text
     dp.include_router(chat.router)  # Free Chat FSM — before buttons/text
+    dp.include_router(dpv_routine.router)  # DPV routine commands/buttons
     dp.include_router(vault_tools.router)  # /health, /memory, /creative
     dp.include_router(buttons.router)  # Reply keyboard buttons
     dp.include_router(voice.router)
@@ -192,6 +194,7 @@ def create_scheduler(bot: Bot, settings: Settings):  # type: ignore[no-untyped-d
     from life_pilot.bot.handlers.weekly import (
         scheduled_weekly_report,
     )
+
     scheduler.add_job(
         scheduled_weekly_report,
         trigger="cron",

@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from life_pilot.config import get_settings
+from life_pilot.services.dpv_routine import (
+    DpvRoutineService,
+    default_dpv_user_key,
+    strip_dpv_daily_block,
+)
 from life_pilot.services.factory import get_runner, get_tasknotes
 
 logger = logging.getLogger(__name__)
@@ -153,7 +158,7 @@ QUESTION_BANK: dict[str, Questions] = {
         },
         {
             "id": "Q-R2",
-            "text": 'Что чаще всего тебе мешало? (данные: {паттерны из monthly рефлексий}). Это нормально — важно увидеть.',  # noqa: E501
+            "text": "Что чаще всего тебе мешало? (данные: {паттерны из monthly рефлексий}). Это нормально — важно увидеть.",  # noqa: E501
         },
         {
             "id": "Q-R3",
@@ -328,6 +333,7 @@ _PERIOD_LABELS: dict[str, str] = {
 # Utility: safe JSON parsing (strips markdown fences)
 # ---------------------------------------------------------------------------
 
+
 def _parse_json(text: str) -> Any:
     """Parse JSON from text, stripping optional markdown code fences."""
     cleaned = text.strip()
@@ -340,6 +346,7 @@ def _parse_json(text: str) -> Any:
 # ---------------------------------------------------------------------------
 # Period helpers
 # ---------------------------------------------------------------------------
+
 
 def get_period_for_session(session_type: str) -> str:
     """Return period string for the current date.
@@ -373,6 +380,7 @@ def get_period_for_session(session_type: str) -> str:
 # State persistence
 # ---------------------------------------------------------------------------
 
+
 def load_grow_state(vault_path: Path) -> GrowState:
     """Load .grow_state.json from vault root. Returns empty dict if missing."""
     state_file = vault_path / ".grow_state.json"
@@ -397,6 +405,7 @@ def save_grow_state(vault_path: Path, state: GrowState) -> None:
 # Reflection check
 # ---------------------------------------------------------------------------
 
+
 def is_reflection_done(session_type: str, period: str, vault_path: Path) -> bool:
     """Check if a final .md reflection file exists for this session+period."""
     target = vault_path / "reflections" / session_type / f"{period}.md"
@@ -406,6 +415,7 @@ def is_reflection_done(session_type: str, period: str, vault_path: Path) -> bool
 # ---------------------------------------------------------------------------
 # Draft management
 # ---------------------------------------------------------------------------
+
 
 def save_draft(
     session_type: str,
@@ -424,9 +434,7 @@ def save_draft(
     return draft_path
 
 
-def load_draft(
-    session_type: str, period: str, vault_path: Path
-) -> GrowDraft | None:
+def load_draft(session_type: str, period: str, vault_path: Path) -> GrowDraft | None:
     """Load draft if it exists. Returns parsed dict or None."""
     draft_path = vault_path / "reflections" / session_type / f"{period}.draft.md"
     if not draft_path.exists():
@@ -438,9 +446,7 @@ def load_draft(
         return None
 
 
-def delete_draft(
-    session_type: str, period: str, vault_path: Path
-) -> None:
+def delete_draft(session_type: str, period: str, vault_path: Path) -> None:
     """Delete draft file if it exists."""
     draft_path = vault_path / "reflections" / session_type / f"{period}.draft.md"
     if draft_path.exists():
@@ -478,6 +484,7 @@ def find_latest_draft(
 # ---------------------------------------------------------------------------
 # Context collection
 # ---------------------------------------------------------------------------
+
 
 def get_previous_reflections(
     session_type: str, vault_path: Path, limit: int = 4
@@ -533,10 +540,9 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
         tasks = tasknotes.fetch_active_tasks()
         today_str = date.today().isoformat()
         overdue = [
-            t for t in tasks
-            if t.get("due")
-            and t["due"].get("date")
-            and t["due"]["date"] < today_str
+            t
+            for t in tasks
+            if t.get("due") and t["due"].get("date") and t["due"]["date"] < today_str
         ]
         total = len(tasks)
         overdue_count = len(overdue)
@@ -556,7 +562,21 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
     if prev:
         sections.append(f"=== PREVIOUS REFLECTIONS ===\n{prev}")
 
-    # 4. Weekly: also read last 7 days of daily notes (first 300 chars each)
+    # 4. DPV: structured self-tracking patterns for weekly reflection.
+    if session_type == "weekly":
+        user_key = default_dpv_user_key()
+        if user_key:
+            try:
+                dpv_context = DpvRoutineService(vault_path).get_week_context(
+                    user_key,
+                    date.today(),
+                )
+                if dpv_context:
+                    sections.append(f"=== DPV WEEK CONTEXT ===\n{dpv_context}")
+            except Exception:
+                logger.warning("Failed to collect DPV context for GROW")
+
+    # 5. Weekly: also read last 7 days of daily notes (first 300 chars each)
     if session_type == "weekly":
         daily_dir = vault_path / "daily"
         if daily_dir.exists():
@@ -567,7 +587,9 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
                 note_path = daily_dir / f"{d.isoformat()}.md"
                 if note_path.exists():
                     try:
-                        content = note_path.read_text(encoding="utf-8")[:300]
+                        content = strip_dpv_daily_block(
+                            note_path.read_text(encoding="utf-8")
+                        )[:300]
                         daily_parts.append(f"--- {d.isoformat()} ---\n{content}")
                     except Exception:
                         pass
@@ -582,6 +604,7 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Claude call #1: select questions
 # ---------------------------------------------------------------------------
+
 
 async def select_questions(session_type: str) -> Questions:
     """Use Claude to select the most relevant questions for the session."""
@@ -664,6 +687,7 @@ def _fallback_random_selection(session_type: str) -> Questions:
 # Claude call #2: analyze answers
 # ---------------------------------------------------------------------------
 
+
 async def analyze_answers(
     session_type: str,
     questions: Questions,
@@ -741,12 +765,16 @@ outcome). Не результат, а действие: не "написать 5
 process_goals: [].
 
 Не выдумывай ответы за пользователя. Основывайся ТОЛЬКО на том что он написал.
-{f"""
+{
+        f'''
 КОРРЕКЦИЯ ОТ ПОЛЬЗОВАТЕЛЯ:
 Пользователь попросил скорректировать предыдущий анализ:
 "{correction}"
 Учти это замечание при формировании итога и предложений по целям.
-""" if correction else ""}
+'''
+        if correction
+        else ""
+    }
 CRITICAL OUTPUT FORMAT:
 Верни ТОЛЬКО валидный JSON, без markdown-обёртки."""
 
@@ -811,11 +839,7 @@ def _update_coaching_context(
         for g in process_goals
         if g.get("outcome") and g.get("behavior")
     )
-    table = (
-        "| Цель (outcome) | Ежедневное действие |\n"
-        "|---|---|\n"
-        f"{rows}"
-    )
+    table = f"| Цель (outcome) | Ежедневное действие |\n|---|---|\n{rows}"
 
     today_str = date.today().isoformat()
     session_label = _SESSION_LABELS.get(session_type, session_type)
@@ -833,6 +857,7 @@ def _update_coaching_context(
 # ---------------------------------------------------------------------------
 # Finalize reflection
 # ---------------------------------------------------------------------------
+
 
 def finalize_reflection(
     session_type: str,
@@ -910,6 +935,7 @@ date: {today_str}
 # ---------------------------------------------------------------------------
 # Goal file updater
 # ---------------------------------------------------------------------------
+
 
 def update_goals(file_path: Path, sections: dict[str, str]) -> None:
     """Update a markdown file by finding section headers and replacing content.

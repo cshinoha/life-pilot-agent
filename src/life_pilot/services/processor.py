@@ -13,6 +13,11 @@ from life_pilot.config import get_settings
 
 from .calendar_integration import get_calendar_events
 from .claude_runner import ClaudeRunner
+from .dpv_routine import (
+    DpvRoutineService,
+    default_dpv_user_key,
+    strip_dpv_daily_block,
+)
 from .tasknotes import TaskNotesService
 
 logger = logging.getLogger(__name__)
@@ -39,6 +44,55 @@ class ClaudeProcessor:
             settings.llm_model,
         )
         self.tasknotes = TaskNotesService(vault_path, tasknotes_path)
+        self.dpv = DpvRoutineService(self.vault_path)
+
+    def _read_dpv_day_context(
+        self,
+        day: date | None = None,
+        max_chars: int = 2000,
+    ) -> str:
+        """Read structured DPV day context for Life Pilot prompts."""
+        user_key = default_dpv_user_key()
+        if not user_key:
+            return ""
+        try:
+            context = self.dpv.get_day_context(user_key, day or date.today())
+        except Exception:
+            logger.warning("Could not read DPV day context", exc_info=True)
+            return ""
+        return context[:max_chars]
+
+    def _read_dpv_week_context(
+        self,
+        reference_day: date | None = None,
+        max_chars: int = 3000,
+    ) -> str:
+        """Read structured DPV week context for Life Pilot prompts."""
+        user_key = default_dpv_user_key()
+        if not user_key:
+            return ""
+        try:
+            context = self.dpv.get_week_context(user_key, reference_day or date.today())
+        except Exception:
+            logger.warning("Could not read DPV week context", exc_info=True)
+            return ""
+        return context[:max_chars]
+
+    def _format_dpv_prompt_block(self, title: str, content: str) -> str:
+        if not content:
+            return ""
+        return f"\n=== {title} ===\n{content}\n=== END {title} ===\n"
+
+    def _format_dpv_plan_section(self, day: date) -> str:
+        """Format today's DPV state for the deterministic /plan output."""
+        context = self._read_dpv_day_context(day, max_chars=1200)
+        if not context:
+            return ""
+        lines = context.splitlines()
+        if lines and lines[0].startswith("DPV"):
+            lines = lines[1:]
+        visible = [f"• {line.removeprefix('- ')}" for line in lines if line.strip()]
+        return "🧭 DPV сегодня:\n" + "\n".join(visible) + "\n\n"
 
     def _html_to_markdown(self, html: str) -> str:
         """Convert Telegram HTML to Obsidian Markdown."""
@@ -99,16 +153,24 @@ week: {year}-W{week:02d}
             return {"error": f"No daily file for {day}", "processed_entries": 0}
 
         content = daily_file.read_text(encoding="utf-8", errors="replace")
+        dpv_context = self._read_dpv_day_context(day)
+        content_for_classification = strip_dpv_daily_block(content)
 
         prompt = f"""Сегодня {day}. Проанализируй записи из дневника за сегодня.
 
-ДНЕВНИК:
-{content}
+DPV-КОНТЕКСТ ДНЯ (используй только как фон, НЕ классифицируй):
+{dpv_context or "нет DPV-данных"}
+
+ДНЕВНИК ДЛЯ КЛАССИФИКАЦИИ (DPV-блок удалён):
+{content_for_classification}
 
 ВАЖНО: Записи с тегами [forward from: ...] и [link] — это входящие материалы (inbox).
 НЕ классифицируй их и НЕ создавай из них задачи или заметки.
 В отчёте просто укажи: 'Сохранено N ссылок/пересланных сообщений'.
 Пропусти такие записи при классификации.
+
+DPV-блок между markers life-pilot:dpv — это структурированный self-tracking.
+НЕ превращай сон/настроение/страхи/благодарность из DPV в задачи или мысли.
 
 ЗАДАЧА: Классифицируй каждую запись на:
 - task: явное действие, требующее выполнения ("купить", "позвонить", "сделать X")
@@ -146,7 +208,7 @@ week: {year}-W{week:02d}
                 text = text.rsplit("\n", 1)[0] if "\n" in text else text[:-3]
             parsed = json.loads(text.strip())
         except (json.JSONDecodeError, ValueError):
-            match = re.search(r'\{[\s\S]*\}', raw)
+            match = re.search(r"\{[\s\S]*\}", raw)
             if match:
                 try:
                     parsed = json.loads(match.group())
@@ -161,12 +223,12 @@ week: {year}-W{week:02d}
                 "uncertain": parsed.get("uncertain", []),
             }
 
-        logger.warning(
-            "Failed to parse categorization JSON.\nRaw: %s", raw[:300]
-        )
+        logger.warning("Failed to parse categorization JSON.\nRaw: %s", raw[:300])
         return {
-            "confident": [], "uncertain": [],
-            "parse_error": "no valid JSON", "raw": raw,
+            "confident": [],
+            "uncertain": [],
+            "parse_error": "no valid JSON",
+            "raw": raw,
         }
 
     def process_daily_finalize(
@@ -226,6 +288,7 @@ CRITICAL OUTPUT FORMAT:
             }
 
         skill_content = self.runner.load_skill_content()
+        dpv_context = self._read_dpv_day_context(day)
 
         tasknotes_dir = self.tasknotes.relative_tasks_dir.as_posix()
 
@@ -235,6 +298,10 @@ CRITICAL OUTPUT FORMAT:
 {skill_content}
 === END SKILL ===
 
+=== DPV DAY CONTEXT ===
+{dpv_context or "нет DPV-данных"}
+=== END DPV DAY CONTEXT ===
+
 TASK STORE:
 - Все задачи лежат в {tasknotes_dir} как markdown task notes
 - Создавай/обновляй task notes напрямую через файловую систему vault
@@ -242,6 +309,8 @@ TASK STORE:
   и распределение due на ближайшие 7 дней
 - Никогда не упоминай Todoist, MCP или ручное добавление
 - Если запись не удалось сохранить, покажи точную ошибку в отчёте
+- DPV-блок между markers life-pilot:dpv используй только как контекст дня;
+  НЕ классифицируй его bullets как отдельные задачи или мысли
 
 CRITICAL OUTPUT FORMAT:
 - Return ONLY raw HTML for Telegram (parse_mode=HTML)
@@ -341,6 +410,7 @@ EXECUTION:
     def _read_diary_recent(self, max_chars: int = 800) -> str:
         """Read today's and yesterday's daily entries, capped at max_chars."""
         from datetime import timedelta
+
         lines: list[str] = []
         for delta in (0, 1):
             day = date.today() - timedelta(days=delta)
@@ -348,6 +418,7 @@ EXECUTION:
             if path.exists():
                 try:
                     content = path.read_text(encoding="utf-8").strip()
+                    content = strip_dpv_daily_block(content)
                     if content:
                         lines.append(f"[{day.isoformat()}]\n{content}")
                 except Exception:
@@ -388,6 +459,8 @@ EXECUTION:
         coaching_ctx = self._read_coaching_context()
         diary_recent = self._read_diary_recent()
         last_session = self._read_last_coach_session()
+        dpv_day = self._read_dpv_day_context(today)
+        dpv_week = self._read_dpv_week_context(today)
 
         history_text = "\n".join(
             f"{'Пользователь' if m['role'] == 'user' else 'Коуч'}: {m['content']}"
@@ -411,12 +484,16 @@ EXECUTION:
 """
 
         diary_block = (
-            f"\nДНЕВНИК (последние записи):\n{diary_recent}\n"
-            if diary_recent else ""
+            f"\nДНЕВНИК (последние записи):\n{diary_recent}\n" if diary_recent else ""
         )
         last_session_block = (
-            f"\nПОСЛЕДНЯЯ КОУЧ-СЕССИЯ:\n{last_session}\n"
-            if last_session else ""
+            f"\nПОСЛЕДНЯЯ КОУЧ-СЕССИЯ:\n{last_session}\n" if last_session else ""
+        )
+        dpv_block = "".join(
+            [
+                self._format_dpv_prompt_block("DPV TODAY", dpv_day),
+                self._format_dpv_prompt_block("DPV WEEK", dpv_week),
+            ]
         )
 
         prompt = f"""Сегодня {today}. Ты — умный друг, который умеет слушать
@@ -424,11 +501,12 @@ EXECUTION:
 НЕ ассистент-исполнитель. Собеседник с навыками.
 
 ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
-{coaching_ctx}{diary_block}{last_session_block}
+{coaching_ctx}{diary_block}{last_session_block}{dpv_block}
 ПРАВИЛО КОНТЕКСТА: НЕ демонстрируй знание профиля/дневника
 в каждом сообщении. Используй только когда тема органично
 пересекается с тем, что говорит пользователь.
 Без ссылки на источник: "Это ведь связано с [цель]?"
+DPV используй как мягкий сигнал ресурса/паттернов, а не как диагноз.
 
 ИСТОРИЯ:
 {history_text}
@@ -575,7 +653,11 @@ STATE MACHINE — определи состояние по сигналам в �
         return self.runner.run(prompt, "Coach reflection", model=self.coach_model)
 
     def _patch_section_with_cap(
-        self, content: str, header: str, new_item: str, max_items: int = 15,
+        self,
+        content: str,
+        header: str,
+        new_item: str,
+        max_items: int = 15,
     ) -> str:
         """Add item to markdown list section, evict oldest if over cap."""
         lines = content.splitlines()
@@ -603,7 +685,9 @@ STATE MACHINE — определи состояние по сигналам в �
         return "\n".join(lines)
 
     def save_coach_insights(
-        self, history: list[dict[str, str]], reflection_answer: str = "",
+        self,
+        history: list[dict[str, str]],
+        reflection_answer: str = "",
     ) -> dict[str, Any]:
         """Summarize coach session, update coaching_context, save to daily vault."""
         from datetime import datetime
@@ -617,7 +701,8 @@ STATE MACHINE — определи состояние по сигналам в �
         )
         reflection_block = (
             f"\nОТВЕТ НА ФИНАЛЬНЫЙ ВОПРОС:\n{reflection_answer}\n"
-            if reflection_answer else ""
+            if reflection_answer
+            else ""
         )
 
         prompt = f"""Проанализируй коуч-сессию и извлеки структурированные данные.
@@ -660,7 +745,7 @@ STATE MACHINE — определи состояние по сигналам в �
                 text = text.rsplit("\n", 1)[0] if "\n" in text else text[:-3]
             data = json.loads(text.strip())
         except (json.JSONDecodeError, ValueError):
-            m = re.search(r'\{[\s\S]*\}', raw)
+            m = re.search(r"\{[\s\S]*\}", raw)
             try:
                 data = json.loads(m.group()) if m else {}
             except Exception:
@@ -694,12 +779,16 @@ STATE MACHINE — определи состояние по сигналам в �
             for item in data.get("energy_updates", []):
                 if item and item not in content:
                     content = self._patch_section_with_cap(
-                        content, "## Что даёт энергию", item,
+                        content,
+                        "## Что даёт энергию",
+                        item,
                     )
             for item in data.get("flag_updates", []):
                 if item and item not in content:
                     content = self._patch_section_with_cap(
-                        content, "## Флаги (когда нужно пнуть)", item,
+                        content,
+                        "## Флаги (когда нужно пнуть)",
+                        item,
                     )
             ctx_path.write_text(content, encoding="utf-8")
 
@@ -717,8 +806,7 @@ STATE MACHINE — определи состояние по сигналам в �
         if not data:
             return {
                 "report": (
-                    "✅ Coach Mode завершён. Ничего нового"
-                    " в профиль не добавлено."
+                    "✅ Coach Mode завершён. Ничего нового в профиль не добавлено."
                 )
             }
 
@@ -826,7 +914,9 @@ STATE MACHINE — определи состояние по сигналам в �
             logger.warning("Could not backup coaching_context.md")
 
         result = self.runner.run(
-            prompt, "Coach profile compact", model=self.coach_model,
+            prompt,
+            "Coach profile compact",
+            model=self.coach_model,
         )
         if "error" in result:
             return result
@@ -838,7 +928,8 @@ STATE MACHINE — определи состояние по сигналам в �
 
         ctx_path.write_text(new_content, encoding="utf-8")
         logger.info(
-            "coaching_context.md compacted (%d sessions)", len(sessions_this_month),
+            "coaching_context.md compacted (%d sessions)",
+            len(sessions_this_month),
         )
         return {
             "report": (
@@ -935,8 +1026,13 @@ CRITICAL OUTPUT FORMAT:
         """Generate weekly digest with Claude."""
         today = date.today()
         tasknotes_dir = self.tasknotes.relative_tasks_dir.as_posix()
+        dpv_week = self._read_dpv_week_context(today)
 
         prompt = f"""Сегодня {today}. Сгенерируй недельный дайджест.
+
+=== DPV WEEK CONTEXT ===
+{dpv_week or "нет DPV-данных за неделю"}
+=== END DPV WEEK CONTEXT ===
 
 TASK STORE:
 - Активные и выполненные задачи лежат в {tasknotes_dir}
@@ -946,9 +1042,11 @@ TASK STORE:
 
 WORKFLOW:
 1. Собери данные за неделю (daily файлы в vault/daily/, task notes в vault)
-2. Проанализируй прогресс по целям (goals/3-weekly.md)
-3. Определи победы и вызовы
-4. Сгенерируй HTML отчёт
+2. Учти DPV WEEK CONTEXT как отдельную секцию ресурса/паттернов
+   и не дублируй raw DPV-блоки из daily files
+3. Проанализируй прогресс по целям (goals/3-weekly.md)
+4. Определи победы и вызовы
+5. Сгенерируй HTML отчёт
 
 CRITICAL OUTPUT FORMAT:
 - Return ONLY raw HTML for Telegram (parse_mode=HTML)
@@ -962,7 +1060,8 @@ CRITICAL OUTPUT FORMAT:
         if "report" in result:
             try:
                 summary_path = self._save_weekly_summary(
-                    result["report"], today,
+                    result["report"],
+                    today,
                 )
                 self._update_weekly_moc(summary_path)
             except Exception as e:
@@ -977,7 +1076,7 @@ CRITICAL OUTPUT FORMAT:
         tz = _TZ
         today = datetime.now(tz)
         last_month = today.replace(day=1) - timedelta(days=1)
-        month_name = last_month.strftime('%B %Y')
+        month_name = last_month.strftime("%B %Y")
         tasknotes_dir = self.tasknotes.relative_tasks_dir.as_posix()
 
         prompt = f"""Сегодня {today.date()}. Сгенерируй месячный отчёт за {month_name}.
@@ -1116,7 +1215,7 @@ updated: {today.isoformat()}
 
         tz = _TZ
         today = datetime.now(tz)
-        today_str = today.strftime('%Y-%m-%d')
+        today_str = today.strftime("%Y-%m-%d")
 
         try:
             events = get_calendar_events(days_ahead=0)
@@ -1126,12 +1225,14 @@ updated: {today.isoformat()}
 
         all_active = self.tasknotes.fetch_active_tasks()
         tasks_planned = [
-            t for t in all_active
-            if t.get('due') and t['due'].get('date', '') == today_str
+            t
+            for t in all_active
+            if t.get("due") and t["due"].get("date", "") == today_str
         ]
         overdue = [
-            t for t in all_active
-            if t.get('due') and t['due'].get('date', '') < today_str
+            t
+            for t in all_active
+            if t.get("due") and t["due"].get("date", "") < today_str
         ]
 
         completed_count = self.tasknotes.fetch_completed_today(today_str)
@@ -1146,9 +1247,7 @@ updated: {today.isoformat()}
 
         total_planned = len(tasks_planned)
         if total_planned > 0 or completed_count > 0:
-            summary += (
-                f"✅ Выполнено: {completed_count}/{total_planned} задач\n"
-            )
+            summary += f"✅ Выполнено: {completed_count}/{total_planned} задач\n"
             if total_planned > 0:
                 progress = int((completed_count / total_planned) * 100)
                 summary += f"📊 Прогресс: {progress}%\n"
@@ -1156,9 +1255,7 @@ updated: {today.isoformat()}
 
         if overdue:
             summary += f"⚠️ Просрочено задач: {len(overdue)}\n"
-            for task in sorted(
-                overdue, key=lambda t: -t.get('priority', 1)
-            )[:3]:
+            for task in sorted(overdue, key=lambda t: -t.get("priority", 1))[:3]:
                 summary += f"• {task['content']}\n"
             summary += "\n"
 
@@ -1173,7 +1270,7 @@ updated: {today.isoformat()}
 
         tz = _TZ
         today = datetime.now(tz)
-        today_str = today.strftime('%Y-%m-%d')
+        today_str = today.strftime("%Y-%m-%d")
 
         try:
             events = get_calendar_events(days_ahead=0)
@@ -1183,10 +1280,10 @@ updated: {today.isoformat()}
 
         all_tasks = self.tasknotes.fetch_active_tasks()
 
-        priority_map = {4: '🔴 P1', 3: '🟡 P2', 2: '⚪ P3', 1: '⚫ P4'}
+        priority_map = {4: "🔴 P1", 3: "🟡 P2", 2: "⚪ P3", 1: "⚫ P4"}
 
         def sort_key(t: dict[str, Any]) -> int:
-            return -int(t.get('priority', 1))
+            return -int(t.get("priority", 1))
 
         today_tasks = []
         overdue_tasks = []
@@ -1196,20 +1293,18 @@ updated: {today.isoformat()}
         no_date_tasks = []
 
         for task in all_tasks:
-            due = task.get('due')
+            due = task.get("due")
             if not due:
                 no_date_tasks.append(task)
                 continue
 
-            due_date_str = due.get('date', '')
+            due_date_str = due.get("date", "")
             if due_date_str == today_str:
                 today_tasks.append(task)
             elif due_date_str < today_str:
                 overdue_tasks.append(task)
                 try:
-                    due_date = tz.localize(
-                        datetime.strptime(due_date_str, '%Y-%m-%d')
-                    )
+                    due_date = tz.localize(datetime.strptime(due_date_str, "%Y-%m-%d"))
                     days_overdue = (today - due_date).days
                     if 1 <= days_overdue <= 3:
                         fresh_overdue.append(task)
@@ -1224,28 +1319,28 @@ updated: {today.isoformat()}
         moved_count = 0
         if fresh_overdue:
             for task in list(fresh_overdue):
-                ok, err = self.tasknotes.reschedule_to_today(task['id'])
+                ok, err = self.tasknotes.reschedule_to_today(task["id"])
                 if ok:
                     moved_count += 1
-                    today_tasks.append({
-                        **task,
-                        'due': {'date': today_str},
-                    })
+                    today_tasks.append(
+                        {
+                            **task,
+                            "due": {"date": today_str},
+                        }
+                    )
                     if task in overdue_tasks:
                         overdue_tasks.remove(task)
                 else:
                     logger.warning(
                         "Failed to reschedule task %s (%s): %s",
-                        task.get('id'), task.get('content', '')[:50], err,
+                        task.get("id"),
+                        task.get("content", "")[:50],
+                        err,
                     )
 
         # Расчёт времени
-        work_start = today.replace(
-            hour=9, minute=0, second=0, microsecond=0
-        )
-        work_end = today.replace(
-            hour=18, minute=0, second=0, microsecond=0
-        )
+        work_start = today.replace(hour=9, minute=0, second=0, microsecond=0)
+        work_end = today.replace(hour=18, minute=0, second=0, microsecond=0)
         total_available = 9.0
 
         busy_hours = 0.0
@@ -1253,14 +1348,12 @@ updated: {today.isoformat()}
             for event in events:
                 try:
                     event_start = datetime.fromisoformat(
-                        event['start'].replace('Z', '+00:00')
+                        event["start"].replace("Z", "+00:00")
                     ).astimezone(tz)
                     event_end = datetime.fromisoformat(
-                        event['end'].replace('Z', '+00:00')
+                        event["end"].replace("Z", "+00:00")
                     ).astimezone(tz)
-                    busy_hours += (
-                        (event_end - event_start).total_seconds() / 3600
-                    )
+                    busy_hours += (event_end - event_start).total_seconds() / 3600
                 except Exception:
                     pass
 
@@ -1269,76 +1362,73 @@ updated: {today.isoformat()}
         # Расчёт свободных окон
         free_windows: list[dict[str, Any]] = []
         if events:
-            sorted_events = sorted(events, key=lambda e: e['start'])
+            sorted_events = sorted(events, key=lambda e: e["start"])
             current_time = work_start
 
             for event in sorted_events:
                 try:
                     event_start = datetime.fromisoformat(
-                        event['start'].replace('Z', '+00:00')
+                        event["start"].replace("Z", "+00:00")
                     ).astimezone(tz)
                     event_end = datetime.fromisoformat(
-                        event['end'].replace('Z', '+00:00')
+                        event["end"].replace("Z", "+00:00")
                     ).astimezone(tz)
 
                     if event_start > current_time:
-                        gap_hours = (
-                            (event_start - current_time).total_seconds()
-                            / 3600
-                        )
+                        gap_hours = (event_start - current_time).total_seconds() / 3600
                         if gap_hours >= 1:
-                            free_windows.append({
-                                'start': current_time.strftime('%H:%M'),
-                                'end': event_start.strftime('%H:%M'),
-                                'hours': gap_hours,
-                            })
+                            free_windows.append(
+                                {
+                                    "start": current_time.strftime("%H:%M"),
+                                    "end": event_start.strftime("%H:%M"),
+                                    "hours": gap_hours,
+                                }
+                            )
                     current_time = max(current_time, event_end)
                 except Exception:
                     pass
 
             if current_time < work_end:
-                gap_hours = (
-                    (work_end - current_time).total_seconds() / 3600
-                )
+                gap_hours = (work_end - current_time).total_seconds() / 3600
                 if gap_hours >= 1:
-                    free_windows.append({
-                        'start': current_time.strftime('%H:%M'),
-                        'end': work_end.strftime('%H:%M'),
-                        'hours': gap_hours,
-                    })
+                    free_windows.append(
+                        {
+                            "start": current_time.strftime("%H:%M"),
+                            "end": work_end.strftime("%H:%M"),
+                            "hours": gap_hours,
+                        }
+                    )
 
         # ── Формируем план ──
         plan = "📅 ПЛАН НА СЕГОДНЯ\n\n"
 
-        plan += (
-            f"⏱ Доступно: {free_hours:.1f}ч"
-            f" | 📋 Занято: {busy_hours:.1f}ч\n\n"
-        )
+        plan += f"⏱ Доступно: {free_hours:.1f}ч | 📋 Занято: {busy_hours:.1f}ч\n\n"
+
+        dpv_section = self._format_dpv_plan_section(today.date())
+        if dpv_section:
+            plan += dpv_section
 
         if events:
             plan += "🗓 События:\n"
             for event in events:
                 start_time = (
-                    event['start'].split('T')[1][:5]
-                    if 'T' in event['start']
-                    else event['start']
+                    event["start"].split("T")[1][:5]
+                    if "T" in event["start"]
+                    else event["start"]
                 )
                 end_time = (
-                    event['end'].split('T')[1][:5]
-                    if 'T' in event['end']
-                    else event['end']
+                    event["end"].split("T")[1][:5]
+                    if "T" in event["end"]
+                    else event["end"]
                 )
-                plan += (
-                    f"• {start_time}-{end_time}: {event['summary']}\n"
-                )
+                plan += f"• {start_time}-{end_time}: {event['summary']}\n"
             plan += "\n"
 
         if free_windows:
             plan += "⏰ Свободные окна:\n"
             for window in free_windows:
                 plan += (
-                    f"• {window['start']}-{window['end']}"
-                    f" ({window['hours']:.1f}ч)\n"
+                    f"• {window['start']}-{window['end']} ({window['hours']:.1f}ч)\n"
                 )
             plan += "\n"
 
@@ -1348,15 +1438,11 @@ updated: {today.isoformat()}
 
             plan += f"🔥 Задачи на сегодня ({total_today}):\n"
             for task in sorted_today[:10]:
-                p = task.get('priority', 1)
-                plan += (
-                    f"{priority_map.get(p, '⚫ P4')}: {task['content']}\n"
-                )
+                p = task.get("priority", 1)
+                plan += f"{priority_map.get(p, '⚫ P4')}: {task['content']}\n"
 
             if moved_count > 0:
-                plan += (
-                    f"\n🔄 Автоперенесено просрочек: {moved_count}\n"
-                )
+                plan += f"\n🔄 Автоперенесено просрочек: {moved_count}\n"
             plan += "\n"
 
             if total_today > 8:
@@ -1366,8 +1452,8 @@ updated: {today.isoformat()}
             sorted_overdue = sorted(overdue_tasks, key=sort_key)
             plan += f"⚠️ Просрочены ({len(overdue_tasks)}):\n"
             for task in sorted_overdue[:5]:
-                p = task.get('priority', 1)
-                due_str = task.get('due', {}).get('date', '')
+                p = task.get("priority", 1)
+                due_str = task.get("due", {}).get("date", "")
                 plan += (
                     f"{priority_map.get(p, '⚫ P4')}:"
                     f" {task['content']} (до {due_str})\n"
@@ -1380,8 +1466,8 @@ updated: {today.isoformat()}
             sorted_upcoming = sorted(upcoming_tasks, key=sort_key)
             plan += f"📋 Ближайшие ({len(upcoming_tasks)}):\n"
             for task in sorted_upcoming[:7]:
-                p = task.get('priority', 1)
-                due_str = task.get('due', {}).get('date', '')
+                p = task.get("priority", 1)
+                due_str = task.get("due", {}).get("date", "")
                 plan += (
                     f"{priority_map.get(p, '⚫ P4')}:"
                     f" {task['content']} (до {due_str})\n"
@@ -1394,10 +1480,8 @@ updated: {today.isoformat()}
             sorted_nodate = sorted(no_date_tasks, key=sort_key)
             plan += f"📌 Без срока ({len(no_date_tasks)}):\n"
             for task in sorted_nodate[:5]:
-                p = task.get('priority', 1)
-                plan += (
-                    f"{priority_map.get(p, '⚫ P4')}: {task['content']}\n"
-                )
+                p = task.get("priority", 1)
+                plan += f"{priority_map.get(p, '⚫ P4')}: {task['content']}\n"
             if len(no_date_tasks) > 5:
                 plan += f"... и ещё {len(no_date_tasks) - 5}\n"
             plan += "\n"
@@ -1406,8 +1490,7 @@ updated: {today.isoformat()}
             goals_file = self.vault_path / "goals/3-weekly.md"
             if goals_file.exists():
                 plan += (
-                    "🎯 Напоминание о недельных целях"
-                    " — проверь goals/3-weekly.md\n\n"
+                    "🎯 Напоминание о недельных целях — проверь goals/3-weekly.md\n\n"
                 )
 
         total_all = len(all_tasks)

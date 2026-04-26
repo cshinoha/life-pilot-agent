@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from life_pilot.services.claude_runner import ClaudeRunner
 
 
@@ -14,7 +16,8 @@ def make_runner(tmp_path: Path, llm_cli: str = "codex") -> ClaudeRunner:
 
 
 def test_run_returns_auth_message_without_invoking_exec(
-    monkeypatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Runner should stop early when Codex auth is still pending."""
     runner = make_runner(tmp_path)
@@ -46,7 +49,8 @@ def test_run_returns_auth_message_without_invoking_exec(
 
 
 def test_get_runtime_status_uses_pending_auth_state(
-    monkeypatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Existing pending device auth should be surfaced to the caller."""
     runner = make_runner(tmp_path)
@@ -70,7 +74,11 @@ def test_get_runtime_status_uses_pending_auth_state(
 
     assert status["ready"] is False
     assert status["summary"] == "Codex ждёт авторизацию"
-    assert pending_auth["code"] in status["details"]
+    details = status["details"]
+    code = pending_auth["code"]
+    assert isinstance(details, str)
+    assert isinstance(code, str)
+    assert code in details
 
 
 def test_non_codex_runtime_is_ready(tmp_path: Path) -> None:

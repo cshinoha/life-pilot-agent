@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
+
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
 
 from life_pilot.bot.formatters import format_process_report, sanitize_telegram_html
 from life_pilot.bot.handlers.process import _send_report_with_correction
@@ -50,7 +53,9 @@ class _DummyMessage:
         self.edits.append((text, parse_mode))
 
     async def answer(
-        self, text: str, reply_markup: Any = None,
+        self,
+        text: str,
+        reply_markup: Any = None,
     ) -> _DummyMessage:
         self.answers.append((text, reply_markup))
         return self
@@ -71,7 +76,14 @@ def test_send_report_with_correction_strips_tags() -> None:
     state = _DummyState()
     report = {"report": "<b>Скорректированный отчёт</b><br><div>Строка</div>"}
 
-    asyncio.run(_send_report_with_correction(message, status, report, state))
+    asyncio.run(
+        _send_report_with_correction(
+            cast(Message, message),
+            cast(Message, status),
+            report,
+            cast(FSMContext, state),
+        )
+    )
 
     assert status.edits
     formatted = status.edits[0][0]
