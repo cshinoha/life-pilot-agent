@@ -8,7 +8,7 @@
 
 Не очередной таск-менеджер. Life Pilot — это персональная операционная система, которая захватывает ваши мысли, управляет задачами и — самое главное — помогает рефлексировать, ставить осмысленные цели и реально их достигать. Коучинг-протокол построен на профессиональных психологических фреймворках, а не на шаблонных советах по продуктивности.
 
-Построен на [Claude Code](https://docs.anthropic.com/en/docs/claude-code) + [MCP Protocol](https://modelcontextprotocol.io/) с интеграциями Google Calendar, Todoist и Obsidian.
+Построен на [Claude Code](https://docs.anthropic.com/en/docs/claude-code) с интеграцией Google Calendar и Obsidian vault. Задачи хранятся как TaskNotes-совместимые markdown-файлы прямо внутри vault.
 
 > 🇬🇧 [English version](README.md)
 
@@ -57,7 +57,7 @@ Life Pilot закрывает этот разрыв:
 - **Пересланные сообщения** → извлечение и категоризация
 
 ### 📋 Умное управление задачами
-- Автосоздание задач в **Todoist** с правильными проектами и приоритетами
+- Автосоздание **TaskNotes** markdown-задач в vault с дедлайнами и приоритетами
 - Сортировка входящих мыслей по категориям: идеи, находки, проекты, рефлексии
 - Обнаружение устаревших задач и напоминания
 - Отслеживание переносов и паттернов просрочек
@@ -122,12 +122,12 @@ Life Pilot закрывает этот разрыв:
 | 3 | Здоровье — Память — Открытие |
 | 4 | Коуч — Чат — Помощь |
 
-### 🔄 Интеграции через MCP
+### 🔄 Интеграции
 
 | Сервис | Что делает |
 |---|---|
 | **Google Calendar** | Утренний план, расписание, контекст событий |
-| **Todoist** | Создание задач, сортировка по проектам, приоритеты |
+| **TaskNotes** | Markdown-хранилище задач, переносы и отметка выполнения |
 | **Obsidian** | Хранение заметок, граф знаний, отслеживание целей |
 | **GitHub** | Автокоммит и синхронизация всех изменений vault |
 
@@ -142,10 +142,10 @@ Life Pilot закрывает этот разрыв:
 └──────────────┘     └──────────────┘     └──────────────────┘
                                             │    │    │
                                             ▼    ▼    ▼
-                                     ┌────────┐┌────────┐┌────────┐
-                                     │Todoist ││Google  ││Obsidian│
-                                     │(задачи)││Calendar││(заметки│
-                                     └────────┘└────────┘└────────┘
+                                     ┌─────────┐┌────────┐┌────────┐
+                                     │TaskNotes││Google  ││Obsidian│
+                                     │(задачи) ││Calendar││(заметки)│
+                                     └─────────┘└────────┘└────────┘
 ```
 
 ### Стек
@@ -154,9 +154,9 @@ Life Pilot закрывает этот разрыв:
 - **Менеджер пакетов:** uv (astral.sh)
 - **Telegram-фреймворк:** aiogram 3.0+ (async)
 - **Транскрипция:** Groq Whisper API (whisper-large-v3-turbo, бесплатный тир)
-- **Задачи:** Todoist API
+- **Задачи:** TaskNotes markdown-файлы внутри Obsidian vault
 - **AI-движок:** Claude Code CLI (subprocess)
-- **MCP-серверы:** Todoist, Google Calendar
+- **MCP-серверы:** Google Calendar
 - **Хранение:** файловая система (Obsidian vault, Markdown + JSONL-сессии)
 - **Деплой:** systemd на Ubuntu VPS
 - **Качество кода:** ruff + mypy strict + pytest
@@ -205,7 +205,7 @@ src/life_pilot/
     ├── factory.py           # Singleton factories
     ├── grow.py              # Логика GROW-сессий, банк вопросов, черновики
     ├── session.py           # SessionStorage (JSONL-логирование)
-    ├── todoist.py           # TodoistService (REST API)
+    ├── tasknotes.py         # TaskNotesService (markdown task files)
     ├── vault_search.py      # Поиск по vault с морфологией
     ├── claude_runner.py     # Запуск Claude CLI через subprocess
     ├── calendar_integration.py  # Синхронизация с Google Calendar
@@ -238,7 +238,7 @@ scripts/                     # Автоматизация (process.sh, weekly.py
 | VPS (не РФ/РБ) | Бот работает 24/7 | ~$5/мес |
 | GitHub | Бэкап и синхронизация | Бесплатно |
 | Groq | Транскрипция голоса (Whisper) | Бесплатный тир |
-| Todoist | Управление задачами | Бесплатно / $4/мес Pro |
+| TaskNotes | Управление задачами внутри vault | Бесплатно (плагин Obsidian опционален) |
 
 ### 1. Клонируйте и настройте
 
@@ -253,7 +253,7 @@ cp .env.example .env
 ```env
 TELEGRAM_BOT_TOKEN=       # От @BotFather
 GROQ_API_KEY=             # console.groq.com (бесплатно, транскрипция Whisper)
-TODOIST_API_KEY=          # Todoist → Settings → Integrations
+TASKNOTES_DIR=TaskNotes/Tasks # Относительный путь для markdown-задач
 VAULT_PATH=./vault
 ALLOWED_USER_IDS=[123]    # Ваш Telegram ID (от @userinfobot)
 GIT_PUSH_ENABLED=true

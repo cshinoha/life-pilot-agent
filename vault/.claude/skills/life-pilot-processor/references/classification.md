@@ -16,7 +16,7 @@ Based on user's work context (see [ABOUT.md](ABOUT.md)):
 
 **Keywords:** клиент, сессия, консультация, группа, тренинг, терапия, гештальт, эриксон
 
-**→ Category:** task (p1-p2) → Todoist
+**→ Category:** task (p1-p2) → TaskNotes
 
 ### AI & Tech
 Инструменты, модели, боты, агенты, автоматизация

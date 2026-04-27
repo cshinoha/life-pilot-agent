@@ -8,7 +8,7 @@
 
 Not another task manager or chatbot. Life Pilot is a personal operating system that captures your thoughts, manages your tasks, coaches you through structured reflection, and holds free-form conversations -- all through a single Telegram interface. The coaching protocol is built on professional psychology frameworks, not generic productivity advice.
 
-Built on [Claude Code](https://docs.anthropic.com/en/docs/claude-code) + [MCP Protocol](https://modelcontextprotocol.io/) with Google Calendar, Todoist, and Obsidian integrations.
+Built on [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with Google Calendar integration and an Obsidian vault. Tasks are stored as TaskNotes-compatible markdown notes directly inside the vault.
 
 > [Версия на русском](README.ru.md)
 
@@ -58,7 +58,7 @@ Send anything to Telegram -- the agent figures out what to do with it:
 - **Forwarded messages** -> extracted and categorized
 
 ### Smart Task Management
-- Auto-creates tasks in **Todoist** with correct projects and priorities
+- Auto-creates **TaskNotes** markdown task notes inside your vault with due dates and priorities
 - Sorts incoming thoughts into categories: ideas, learnings, projects, reflections
 - Detects stale tasks and prompts you to act
 - Tracks transfers and overdue patterns
@@ -129,12 +129,12 @@ Every AI action (task creation, goal update, vault write) comes with an Undo but
 | 3 | Health -- Memory -- Discovery |
 | 4 | Coach -- Chat -- Help |
 
-### Integrations via MCP
+### Integrations
 
 | Service | What it does |
 |---|---|
 | **Google Calendar** | Morning plan, schedule awareness, event context |
-| **Todoist** | Task creation, project sorting, priority management |
+| **TaskNotes** | Markdown task storage, rescheduling, completion tracking |
 | **Obsidian** | Note storage, knowledge graph, goal tracking |
 | **GitHub** | Auto-commit and sync of all vault changes |
 
@@ -150,8 +150,8 @@ Every AI action (task creation, goal update, vault write) comes with an Undo but
                                             │    │    │
                                             v    v    v
                                      ┌────────┐┌────────┐┌────────┐
-                                     │Todoist ││Google  ││Obsidian│
-                                     │(tasks) ││Calendar││(notes) │
+                                     │TaskNotes││Google  ││Obsidian│
+                                     │(tasks)  ││Calendar││(notes) │
                                      └────────┘└────────┘└────────┘
 ```
 
@@ -161,9 +161,9 @@ Every AI action (task creation, goal update, vault write) comes with an Undo but
 - **Package manager:** uv (astral.sh)
 - **Telegram framework:** aiogram 3.0+ (async)
 - **Transcription:** Groq Whisper API (whisper-large-v3-turbo, free tier)
-- **Tasks:** Todoist API
+- **Tasks:** TaskNotes markdown files inside the Obsidian vault
 - **AI engine:** Claude Code CLI (subprocess)
-- **MCP servers:** Todoist, Google Calendar
+- **MCP servers:** Google Calendar
 - **Storage:** File system (Obsidian vault, Markdown + JSONL sessions)
 - **Deploy:** systemd on Ubuntu VPS
 - **Code quality:** ruff + mypy strict + pytest
@@ -212,7 +212,7 @@ src/life_pilot/
     ├── factory.py           # Singleton factories
     ├── grow.py              # GROW session logic, question bank, drafts
     ├── session.py           # SessionStorage (JSONL logging)
-    ├── todoist.py           # TodoistService (REST API)
+    ├── tasknotes.py         # TaskNotesService (markdown task files)
     ├── vault_search.py      # Vault search with morphology
     ├── claude_runner.py     # Claude CLI subprocess runner
     ├── calendar_integration.py  # Google Calendar sync
@@ -245,7 +245,7 @@ scripts/                     # Automation (process.sh, weekly.py, send_*.py)
 | VPS (any region) | 24/7 bot hosting | ~$5/mo |
 | GitHub | Backup & sync | Free |
 | Groq | Voice transcription (Whisper) | Free tier |
-| Todoist | Task management | Free / $4/mo Pro |
+| TaskNotes | Vault-native task management | Free (Obsidian plugin optional) |
 
 ### 1. Clone and Configure
 
@@ -260,7 +260,7 @@ Edit `.env` with your keys:
 ```env
 TELEGRAM_BOT_TOKEN=           # From @BotFather
 GROQ_API_KEY=                 # console.groq.com (free tier, Whisper transcription)
-TODOIST_API_KEY=              # Todoist → Settings → Integrations
+TASKNOTES_DIR=TaskNotes/Tasks # Relative path for markdown task notes
 VAULT_PATH=./vault            # Path to Obsidian vault
 ALLOWED_USER_IDS=[123456]     # Your Telegram ID (from @userinfobot)
 GIT_PUSH_ENABLED=true         # Auto-push vault changes to GitHub

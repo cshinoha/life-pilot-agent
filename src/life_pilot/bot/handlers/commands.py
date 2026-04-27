@@ -1,6 +1,7 @@
 """Command handlers for /start, /help, /status, /plan."""
 
 import asyncio
+import html
 from datetime import date
 
 from aiogram import Router
@@ -9,7 +10,8 @@ from aiogram.types import Message
 
 from life_pilot.bot.keyboards import get_main_keyboard
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_processor
+from life_pilot.services.dpv_routine import DpvRoutineService
+from life_pilot.services.factory import get_processor, get_runner
 from life_pilot.services.storage import VaultStorage
 
 router = Router(name="commands")
@@ -27,6 +29,11 @@ async def cmd_start(message: Message) -> None:
         "↩️ Пересланные сообщения\n\n"
         "Всё будет сохранено и обработано.\n\n"
         "<b>Команды:</b>\n"
+        "/morning — утренний DPV-ритуал\n"
+        "/evening — вечерний DPV-ритуал\n"
+        "/resume — продолжить DPV-ритуал\n"
+        "/skip — пропустить вопрос DPV-ритуала\n"
+        "/review_week — DPV-обзор недели\n"
         "/do — выполнить произвольный запрос\n"
         "/recall — поиск по записям\n"
         "/process — обработать записи дня\n"
@@ -50,6 +57,9 @@ async def cmd_help(message: Message) -> None:
         "🤖 <b>Сделать</b> — произвольная команда ИИ\n"
         "🔍 <b>Найти</b> — поиск по записям vault\n"
         "🤝 <b>Коуч</b> — диалог с коуч-ассистентом\n"
+        "🌅 <b>Утро</b> — DPV morning routine\n"
+        "🌙 <b>Вечер</b> — DPV evening routine\n"
+        "🧭 <b>Обзор недели</b> — DPV weekly review\n"
         "📋 <b>План</b> — текущие цели и задачи на день\n"
         "📅 <b>Неделя</b> — недельный дайджест\n"
         "📊 <b>Статус</b> — состояние бота и статистика\n"
@@ -65,16 +75,29 @@ async def cmd_status(message: Message) -> None:
     """Handle /status command."""
     settings = get_settings()
     storage = VaultStorage(settings.vault_path)
+    runtime_status = get_runner().get_runtime_status(trigger_bootstrap=True)
 
     today = date.today()
     content = storage.read_daily(today)
+    routine = DpvRoutineService(settings.vault_path)
+    user_id = message.from_user.id if message.from_user else message.chat.id
+    dpv_status = routine.get_daily_status(f"telegram:{user_id}", today)
+
+    llm_block = f"\n\n🤖 <b>LLM:</b> {html.escape(runtime_status['summary'])}"
+    if runtime_status["details"]:
+        llm_block += f"\n{html.escape(runtime_status['details'])}"
 
     if not content:
-        await message.answer(f"📅 <b>{today}</b>\n\nЗаписей пока нет.")
+        await message.answer(
+            f"📅 <b>{today}</b>\n\n"
+            "<b>DPV routine:</b>\n"
+            f"{dpv_status}\n\n"
+            f"Записей пока нет.{llm_block}"
+        )
         return
 
     lines = content.strip().split("\n")
-    entries = [line for line in lines if line.startswith("## ")]
+    entries = [line for line in lines if line.startswith("## ") and "[" in line]
 
     voice_count = sum(1 for e in entries if "[voice]" in e)
     text_count = sum(1 for e in entries if "[text]" in e)
@@ -90,7 +113,11 @@ async def cmd_status(message: Message) -> None:
         f"- 💬 Текстовых: {text_count}\n"
         f"- 📷 Фото: {photo_count}\n"
         f"- ↩️ Пересланных: {forward_count}"
+        "\n\n<b>DPV routine:</b>\n"
+        f"{dpv_status}"
+        f"{llm_block}"
     )
+
 
 @router.message(Command("plan"))
 async def cmd_plan(message: Message) -> None:

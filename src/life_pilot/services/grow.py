@@ -9,18 +9,34 @@ import random
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_runner, get_todoist
+from life_pilot.services.dpv_routine import (
+    DpvRoutineService,
+    default_dpv_user_key,
+    strip_dpv_daily_block,
+)
+from life_pilot.services.factory import get_runner, get_tasknotes
 
 logger = logging.getLogger(__name__)
+
+type Question = dict[str, str]
+type Questions = list[Question]
+type AnswerValue = str | list[str]
+type Answers = dict[str, AnswerValue]
+type GrowDraft = dict[str, Any]
+type GrowStateEntry = dict[str, str | int]
+type GrowState = dict[str, GrowStateEntry]
+type ProcessGoal = dict[str, str]
+type ProcessGoals = list[ProcessGoal]
+type AnalysisResult = dict[str, Any]
 
 # ---------------------------------------------------------------------------
 # Question bank — all questions VERBATIM
 # ---------------------------------------------------------------------------
 
-QUESTION_BANK: dict[str, list[dict[str, str]]] = {
+QUESTION_BANK: dict[str, Questions] = {
     "weekly": [
         # GOAL
         {
@@ -142,7 +158,7 @@ QUESTION_BANK: dict[str, list[dict[str, str]]] = {
         },
         {
             "id": "Q-R2",
-            "text": 'Что чаще всего тебе мешало? (данные: {паттерны из monthly рефлексий}). Это нормально — важно увидеть.',  # noqa: E501
+            "text": "Что чаще всего тебе мешало? (данные: {паттерны из monthly рефлексий}). Это нормально — важно увидеть.",  # noqa: E501
         },
         {
             "id": "Q-R3",
@@ -317,6 +333,7 @@ _PERIOD_LABELS: dict[str, str] = {
 # Utility: safe JSON parsing (strips markdown fences)
 # ---------------------------------------------------------------------------
 
+
 def _parse_json(text: str) -> Any:
     """Parse JSON from text, stripping optional markdown code fences."""
     cleaned = text.strip()
@@ -329,6 +346,7 @@ def _parse_json(text: str) -> Any:
 # ---------------------------------------------------------------------------
 # Period helpers
 # ---------------------------------------------------------------------------
+
 
 def get_period_for_session(session_type: str) -> str:
     """Return period string for the current date.
@@ -362,19 +380,20 @@ def get_period_for_session(session_type: str) -> str:
 # State persistence
 # ---------------------------------------------------------------------------
 
-def load_grow_state(vault_path: Path) -> dict:
+
+def load_grow_state(vault_path: Path) -> GrowState:
     """Load .grow_state.json from vault root. Returns empty dict if missing."""
     state_file = vault_path / ".grow_state.json"
     if not state_file.exists():
         return {}
     try:
-        return json.loads(state_file.read_text(encoding="utf-8"))
+        return cast(GrowState, json.loads(state_file.read_text(encoding="utf-8")))
     except Exception:
         logger.warning("Failed to parse .grow_state.json, returning empty state")
         return {}
 
 
-def save_grow_state(vault_path: Path, state: dict) -> None:
+def save_grow_state(vault_path: Path, state: GrowState) -> None:
     """Save .grow_state.json to vault root."""
     state_file = vault_path / ".grow_state.json"
     state_file.write_text(
@@ -386,6 +405,7 @@ def save_grow_state(vault_path: Path, state: dict) -> None:
 # Reflection check
 # ---------------------------------------------------------------------------
 
+
 def is_reflection_done(session_type: str, period: str, vault_path: Path) -> bool:
     """Check if a final .md reflection file exists for this session+period."""
     target = vault_path / "reflections" / session_type / f"{period}.md"
@@ -396,8 +416,12 @@ def is_reflection_done(session_type: str, period: str, vault_path: Path) -> bool
 # Draft management
 # ---------------------------------------------------------------------------
 
+
 def save_draft(
-    session_type: str, period: str, data: dict, vault_path: Path
+    session_type: str,
+    period: str,
+    data: GrowDraft,
+    vault_path: Path,
 ) -> Path:
     """Save a JSON draft to vault/reflections/{session_type}/{period}.draft.md."""
     draft_dir = vault_path / "reflections" / session_type
@@ -410,23 +434,19 @@ def save_draft(
     return draft_path
 
 
-def load_draft(
-    session_type: str, period: str, vault_path: Path
-) -> dict | None:
+def load_draft(session_type: str, period: str, vault_path: Path) -> GrowDraft | None:
     """Load draft if it exists. Returns parsed dict or None."""
     draft_path = vault_path / "reflections" / session_type / f"{period}.draft.md"
     if not draft_path.exists():
         return None
     try:
-        return json.loads(draft_path.read_text(encoding="utf-8"))
+        return cast(GrowDraft, json.loads(draft_path.read_text(encoding="utf-8")))
     except Exception:
         logger.warning("Failed to parse draft %s", draft_path)
         return None
 
 
-def delete_draft(
-    session_type: str, period: str, vault_path: Path
-) -> None:
+def delete_draft(session_type: str, period: str, vault_path: Path) -> None:
     """Delete draft file if it exists."""
     draft_path = vault_path / "reflections" / session_type / f"{period}.draft.md"
     if draft_path.exists():
@@ -436,7 +456,7 @@ def delete_draft(
 
 def find_latest_draft(
     session_type: str, vault_path: Path
-) -> tuple[str, dict] | None:
+) -> tuple[str, GrowDraft] | None:
     """Find most recent draft for session_type, regardless of period.
 
     Returns (period, data) or None. Used to resume drafts when the date may
@@ -454,7 +474,7 @@ def find_latest_draft(
         return None
     period = drafts[0].stem.removesuffix(".draft")
     try:
-        data = json.loads(drafts[0].read_text(encoding="utf-8"))
+        data = cast(GrowDraft, json.loads(drafts[0].read_text(encoding="utf-8")))
         return period, data
     except Exception:
         logger.warning("Failed to parse draft %s", drafts[0])
@@ -464,6 +484,7 @@ def find_latest_draft(
 # ---------------------------------------------------------------------------
 # Context collection
 # ---------------------------------------------------------------------------
+
 
 def get_previous_reflections(
     session_type: str, vault_path: Path, limit: int = 4
@@ -496,7 +517,7 @@ def get_previous_reflections(
 def collect_grow_context(session_type: str, vault_path: Path) -> str:
     """Collect context for Claude question-selection prompt.
 
-    Reads goals, Todoist tasks, previous reflections, and (for weekly)
+    Reads goals, task notes, previous reflections, and (for weekly)
     recent daily notes.
     """
     sections: list[str] = []
@@ -513,39 +534,49 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
     else:
         sections.append(f"=== GOALS ({goal_rel}) === [file not found]")
 
-    # 2. Todoist tasks
-    todoist = get_todoist()
-    if todoist is not None:
-        try:
-            tasks = todoist.fetch_active_tasks()
-            today_str = date.today().isoformat()
-            overdue = [
-                t for t in tasks
-                if t.get("due")
-                and t["due"].get("date")
-                and t["due"]["date"] < today_str
-            ]
-            total = len(tasks)
-            overdue_count = len(overdue)
-            overdue_names = ", ".join(t.get("content", "?") for t in overdue[:5])
-            sections.append(
-                f"=== TODOIST ===\n"
-                f"Active tasks: {total}\n"
-                f"Overdue: {overdue_count}\n"
-                f"Overdue tasks: {overdue_names or 'none'}"
-            )
-        except Exception:
-            logger.warning("Failed to fetch Todoist tasks for GROW context")
-            sections.append("=== TODOIST === [fetch failed]")
-    else:
-        sections.append("=== TODOIST === [not configured]")
+    # 2. TaskNotes tasks
+    tasknotes = get_tasknotes()
+    try:
+        tasks = tasknotes.fetch_active_tasks()
+        today_str = date.today().isoformat()
+        overdue = [
+            t
+            for t in tasks
+            if t.get("due") and t["due"].get("date") and t["due"]["date"] < today_str
+        ]
+        total = len(tasks)
+        overdue_count = len(overdue)
+        overdue_names = ", ".join(t.get("content", "?") for t in overdue[:5])
+        sections.append(
+            f"=== TASKS ===\n"
+            f"Active tasks: {total}\n"
+            f"Overdue: {overdue_count}\n"
+            f"Overdue tasks: {overdue_names or 'none'}"
+        )
+    except Exception:
+        logger.warning("Failed to fetch TaskNotes tasks for GROW context")
+        sections.append("=== TASKS === [fetch failed]")
 
     # 3. Previous reflections
     prev = get_previous_reflections(session_type, vault_path, limit=4)
     if prev:
         sections.append(f"=== PREVIOUS REFLECTIONS ===\n{prev}")
 
-    # 4. Weekly: also read last 7 days of daily notes (first 300 chars each)
+    # 4. DPV: structured self-tracking patterns for weekly reflection.
+    if session_type == "weekly":
+        user_key = default_dpv_user_key()
+        if user_key:
+            try:
+                dpv_context = DpvRoutineService(vault_path).get_week_context(
+                    user_key,
+                    date.today(),
+                )
+                if dpv_context:
+                    sections.append(f"=== DPV WEEK CONTEXT ===\n{dpv_context}")
+            except Exception:
+                logger.warning("Failed to collect DPV context for GROW")
+
+    # 5. Weekly: also read last 7 days of daily notes (first 300 chars each)
     if session_type == "weekly":
         daily_dir = vault_path / "daily"
         if daily_dir.exists():
@@ -556,7 +587,9 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
                 note_path = daily_dir / f"{d.isoformat()}.md"
                 if note_path.exists():
                     try:
-                        content = note_path.read_text(encoding="utf-8")[:300]
+                        content = strip_dpv_daily_block(
+                            note_path.read_text(encoding="utf-8")
+                        )[:300]
                         daily_parts.append(f"--- {d.isoformat()} ---\n{content}")
                     except Exception:
                         pass
@@ -572,7 +605,8 @@ def collect_grow_context(session_type: str, vault_path: Path) -> str:
 # Claude call #1: select questions
 # ---------------------------------------------------------------------------
 
-async def select_questions(session_type: str) -> list[dict]:
+
+async def select_questions(session_type: str) -> Questions:
     """Use Claude to select the most relevant questions for the session."""
     settings = get_settings()
     vault_path = settings.vault_path
@@ -633,7 +667,7 @@ CRITICAL OUTPUT FORMAT: Верни ТОЛЬКО валидный JSON, без ma
         if isinstance(parsed, list) and all(
             isinstance(q, dict) and "id" in q and "text" in q for q in parsed
         ):
-            return parsed
+            return cast(Questions, parsed)
         logger.warning("Claude returned unexpected structure, using fallback")
         return _fallback_random_selection(session_type)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -641,7 +675,7 @@ CRITICAL OUTPUT FORMAT: Верни ТОЛЬКО валидный JSON, без ma
         return _fallback_random_selection(session_type)
 
 
-def _fallback_random_selection(session_type: str) -> list[dict]:
+def _fallback_random_selection(session_type: str) -> Questions:
     """Randomly pick questions from the bank if Claude call fails."""
     bank = QUESTION_BANK.get(session_type, [])
     min_q, max_q = QUESTION_COUNT.get(session_type, (2, 3))
@@ -653,12 +687,13 @@ def _fallback_random_selection(session_type: str) -> list[dict]:
 # Claude call #2: analyze answers
 # ---------------------------------------------------------------------------
 
+
 async def analyze_answers(
     session_type: str,
-    questions: list[dict],
-    answers: dict,
+    questions: Questions,
+    answers: Answers,
     correction: str | None = None,
-) -> dict:
+) -> AnalysisResult:
     """Use Claude to produce a summary and optional goal updates."""
     settings = get_settings()
     vault_path = settings.vault_path
@@ -730,12 +765,16 @@ outcome). Не результат, а действие: не "написать 5
 process_goals: [].
 
 Не выдумывай ответы за пользователя. Основывайся ТОЛЬКО на том что он написал.
-{f"""
+{
+        f'''
 КОРРЕКЦИЯ ОТ ПОЛЬЗОВАТЕЛЯ:
 Пользователь попросил скорректировать предыдущий анализ:
 "{correction}"
 Учти это замечание при формировании итога и предложений по целям.
-""" if correction else ""}
+'''
+        if correction
+        else ""
+    }
 CRITICAL OUTPUT FORMAT:
 Верни ТОЛЬКО валидный JSON, без markdown-обёртки."""
 
@@ -750,7 +789,7 @@ CRITICAL OUTPUT FORMAT:
     try:
         parsed = _parse_json(raw)
         if isinstance(parsed, dict) and "summary" in parsed:
-            return parsed
+            return cast(AnalysisResult, parsed)
         logger.warning("Claude returned unexpected structure for analysis")
         return {"summary": raw, "goal_updates": None}
     except (json.JSONDecodeError, ValueError):
@@ -764,7 +803,7 @@ CRITICAL OUTPUT FORMAT:
 
 
 def _update_coaching_context(
-    process_goals: list[dict],
+    process_goals: ProcessGoals,
     session_type: str,
     period: str,
     vault_path: Path,
@@ -800,11 +839,7 @@ def _update_coaching_context(
         for g in process_goals
         if g.get("outcome") and g.get("behavior")
     )
-    table = (
-        "| Цель (outcome) | Ежедневное действие |\n"
-        "|---|---|\n"
-        f"{rows}"
-    )
+    table = f"| Цель (outcome) | Ежедневное действие |\n|---|---|\n{rows}"
 
     today_str = date.today().isoformat()
     session_label = _SESSION_LABELS.get(session_type, session_type)
@@ -823,14 +858,15 @@ def _update_coaching_context(
 # Finalize reflection
 # ---------------------------------------------------------------------------
 
+
 def finalize_reflection(
     session_type: str,
     period: str,
     summary: str,
-    questions: list[dict],
-    answers: dict,
+    questions: Questions,
+    answers: Answers,
     vault_path: Path,
-    process_goals: list[dict] | None = None,
+    process_goals: ProcessGoals | None = None,
 ) -> Path:
     """Convert draft to final markdown with YAML frontmatter.
 
@@ -899,6 +935,7 @@ date: {today_str}
 # ---------------------------------------------------------------------------
 # Goal file updater
 # ---------------------------------------------------------------------------
+
 
 def update_goals(file_path: Path, sections: dict[str, str]) -> None:
     """Update a markdown file by finding section headers and replacing content.

@@ -17,12 +17,21 @@ class Settings(BaseSettings):
     )
 
     telegram_bot_token: str = Field(description="Telegram Bot API token")
-    groq_api_key: str = Field(default="", description="Groq API key for Whisper transcription")
-    deepgram_api_key: str = Field(default="", description="Deprecated: Deepgram API key (use groq_api_key)")
-    todoist_api_key: str = Field(default="", description="Todoist API key for tasks")
+    groq_api_key: str = Field(
+        default="",
+        description="Groq API key for Whisper transcription",
+    )
+    deepgram_api_key: str = Field(
+        default="",
+        description="Deprecated: Deepgram API key (use groq_api_key)",
+    )
     vault_path: Path = Field(
         default=Path("./vault"),
         description="Path to Obsidian vault directory",
+    )
+    tasknotes_dir: Path = Field(
+        default=Path("TaskNotes/Tasks"),
+        description="Relative path inside the vault for TaskNotes task files",
     )
     google_token_path: Path = Field(
         default=Path("~/life-pilot/token.json"),
@@ -42,22 +51,37 @@ class Settings(BaseSettings):
     )
     claude_timeout: int = Field(
         default=1200,
-        description="Claude CLI subprocess timeout in seconds",
+        description="LLM CLI subprocess timeout in seconds",
+    )
+    llm_cli: str = Field(
+        default="codex",
+        description="LLM CLI binary to use (codex or claude)",
+    )
+    llm_model: str = Field(
+        default="",
+        description="Default model passed to LLM CLI. Empty = CLI default.",
     )
     coach_model: str = Field(
         default="",
-        description="Claude model for coach mode (e.g. opus). Empty = default.",
+        description="Model override for coach mode. Empty = default model.",
     )
     timezone: str = Field(
         default="Europe/Kyiv",
         description="Timezone for scheduler and date calculations (e.g. Europe/Kyiv)",
     )
 
-    @field_validator("vault_path", "google_token_path", mode="before")
+    @field_validator("vault_path", "google_token_path", "tasknotes_dir", mode="before")
     @classmethod
     def expand_home(cls, v: object) -> Path:
         """Expand ~ in paths (not done automatically in systemd environment)."""
         return Path(str(v)).expanduser()
+
+    @property
+    def tasknotes_path(self) -> Path:
+        """Path to the directory that stores TaskNotes files."""
+        if self.tasknotes_dir.is_absolute():
+            return self.tasknotes_dir
+        return self.vault_path / self.tasknotes_dir
 
     @property
     def daily_path(self) -> Path:

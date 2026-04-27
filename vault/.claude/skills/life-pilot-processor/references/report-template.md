@@ -98,7 +98,7 @@ Show ONLY if client/project mentions exist.
 - Footer: <i>{N} клиентов упомянуто</i>
 
 ### Week Load (📅)
-Call find-tasks-by-date for 7 days.
+Read task notes due in the next 7 days.
 Format: Пн: 4 | Вт: 2 | ...
 
 ### Attention (⚠️)
@@ -110,7 +110,7 @@ Show only if new links created.
 Format: • [[Note A]] ↔ [[Note B]]
 
 ### Priorities (⚡)
-Get tomorrow's tasks from Todoist, sort by priority, show top 3.
+Get tomorrow's tasks from TaskNotes task files, sort by priority, show top 3.
 
 ### Goals Progress (📈)
 Read goals/1-yearly-2026.md, show goals with recent activity.

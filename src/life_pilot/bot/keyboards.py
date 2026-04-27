@@ -20,8 +20,12 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     builder.button(text="ℹ️ Помощь")
     builder.button(text="🎲 Находка")
     # Row 4
+    builder.button(text="🌅 Утро")
+    builder.button(text="🌙 Вечер")
+    builder.button(text="🧭 Обзор недели")
+    # Row 5
     builder.button(text="🏥 Здоровье")
     builder.button(text="🧠 Память")
     builder.button(text="💬 Чат")
-    builder.adjust(3, 3, 3, 3)
+    builder.adjust(3, 3, 3, 3, 3)
     return builder.as_markup(resize_keyboard=True, is_persistent=True)

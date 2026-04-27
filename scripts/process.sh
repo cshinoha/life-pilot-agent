@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# PATH for systemd (claude, uv, npx in ~/.local/bin and node)
+# PATH for systemd (codex/claude, uv, npx in ~/.local/bin and node)
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 # Set HOME if needed: export HOME="/home/ubuntu"
 
@@ -21,6 +21,10 @@ if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     exit 1
 fi
 
+# LLM CLI selection (default: codex)
+LLM_CLI="${LLM_CLI:-codex}"
+LLM_MODEL="${LLM_MODEL:-}"
+
 # Date and chat_id
 TODAY=$(date +%Y-%m-%d)
 CHAT_ID="${ALLOWED_USER_IDS//[\[\]]/}"  # remove brackets from [123456]
@@ -36,7 +40,7 @@ if [ ! -f "$DAILY_FILE" ]; then
 fi
 DAILY_SIZE=$(wc -c < "$DAILY_FILE" 2>/dev/null || echo "0")
 if [ "$DAILY_SIZE" -lt 50 ]; then
-    echo "ORIENT: daily/$TODAY.md is empty ($DAILY_SIZE bytes) — skipping Claude processing"
+    echo "ORIENT: daily/$TODAY.md is empty ($DAILY_SIZE bytes) — skipping LLM processing"
     cd "$VAULT_DIR"
     uv run .claude/skills/graph-builder/scripts/analyze.py 2>/dev/null || true
     cd "$PROJECT_DIR"
@@ -47,13 +51,46 @@ if [ "$DAILY_SIZE" -lt 50 ]; then
     exit 0
 fi
 
-# Run Claude with --dangerously-skip-permissions and MCP
-REPORT=$(claude --print --dangerously-skip-permissions \
-    --mcp-config "$PROJECT_DIR/mcp-config.json" \
-    -p "Today is $TODAY. Execute daily processing according to life-pilot-processor skill." \
-    2>&1) || true
+PROMPT="Today is $TODAY. Execute daily processing according to life-pilot-processor skill."
+REPORT=""
 
-echo "=== Claude output ==="
+if [ "$LLM_CLI" = "claude" ]; then
+    if [ -n "$LLM_MODEL" ]; then
+        REPORT=$(claude --print --dangerously-skip-permissions \
+            --mcp-config "$PROJECT_DIR/mcp-config.json" \
+            --model "$LLM_MODEL" \
+            -p "$PROMPT" 2>&1) || true
+    else
+        REPORT=$(claude --print --dangerously-skip-permissions \
+            --mcp-config "$PROJECT_DIR/mcp-config.json" \
+            -p "$PROMPT" 2>&1) || true
+    fi
+else
+    if ! REPORT=$(uv run python -m life_pilot.llm_bootstrap 2>&1); then
+        echo "Codex bootstrap required; sending auth instructions instead of running exec"
+    else
+        OUT_FILE=$(mktemp)
+        if [ -n "$LLM_MODEL" ]; then
+            codex exec --skip-git-repo-check \
+                --dangerously-bypass-approvals-and-sandbox \
+                --output-last-message "$OUT_FILE" \
+                --model "$LLM_MODEL" \
+                "$PROMPT" >/tmp/life-pilot-codex.log 2>&1 || true
+        else
+            codex exec --skip-git-repo-check \
+                --dangerously-bypass-approvals-and-sandbox \
+                --output-last-message "$OUT_FILE" \
+                "$PROMPT" >/tmp/life-pilot-codex.log 2>&1 || true
+        fi
+        REPORT=$(cat "$OUT_FILE" 2>/dev/null || true)
+        if [ -z "$REPORT" ]; then
+            REPORT=$(cat /tmp/life-pilot-codex.log 2>/dev/null || true)
+        fi
+        rm -f "$OUT_FILE"
+    fi
+fi
+
+echo "=== LLM output ==="
 echo "$REPORT"
 echo "===================="
 

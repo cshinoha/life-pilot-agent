@@ -132,7 +132,7 @@ async def handle_undo(callback: CallbackQuery) -> None:
         await msg.edit_reply_markup(reply_markup=None)
         await msg.answer(
             f"↩️ <b>Отменено:</b> {payload.description}\n\n"
-            "⚠️ Если были созданы задачи в Todoist — удали их вручную."
+            "⚠️ Если были созданы task notes — удали их вручную."
         )
         logger.info("Undo successful: reverted %s", payload.commit_sha[:8])
     else:

@@ -17,6 +17,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from life_pilot.bot.formatters import format_process_report
 from life_pilot.bot.progress import BusyError, run_with_progress
 from life_pilot.bot.states import ProcessStates
 from life_pilot.bot.undo import register_undo, schedule_button_removal
@@ -64,7 +65,7 @@ async def _send_report_with_correction(
     commit_sha: str = "",
 ) -> None:
     """Send report and add correction + undo keyboard. Save report in FSM state."""
-    formatted = report.get("report", report.get("error", ""))
+    formatted = format_process_report(report)
     try:
         await status_msg.edit_text(formatted)
     except Exception:
@@ -97,7 +98,7 @@ async def _finalize_processing(
     day: date,
     state: FSMContext,
 ) -> None:
-    """Run process_daily_finalize, commit, and send report with correction/undo keyboard."""
+    """Run finalize flow, commit changes, and send correction/undo UI."""
     processor = get_processor()
     git = get_git()
 
@@ -398,7 +399,7 @@ async def handle_correction_input(
 Пользователь просит внести правки:
 {prompt_text}
 
-Скорректируй отчёт с учётом правок и обнови данные в Todoist/vault если нужно.
+Скорректируй отчёт с учётом правок и обнови данные в TaskNotes/vault если нужно.
 
 CRITICAL OUTPUT FORMAT:
 - Return ONLY raw HTML for Telegram (parse_mode=HTML)

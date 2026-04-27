@@ -14,7 +14,7 @@ from aiogram.types import Message
 
 from life_pilot.bot.components.task_keyboard import create_task_keyboard
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_runner, get_todoist
+from life_pilot.services.factory import get_runner, get_tasknotes
 from life_pilot.services.vault_search import search_vault
 
 router = Router(name="monthly")
@@ -49,7 +49,7 @@ def _reset_monthly_flag(vault_path: Path) -> None:
 # ── Data collection ───────────────────────────────────────────────────
 
 
-def _collect_monthly_context(vault_path: Path, todoist_api_key: str) -> str:
+def _collect_monthly_context(vault_path: Path) -> str:
     """Collect summaries, goals, and vault search results for monthly prompt."""
     context_parts: list[str] = []
 
@@ -111,18 +111,23 @@ async def _generate_and_send_monthly(bot: Bot, chat_id: int) -> None:
     month_name = last_month.strftime("%B %Y")
 
     context = await asyncio.to_thread(
-        _collect_monthly_context, settings.vault_path, settings.todoist_api_key
+        _collect_monthly_context, settings.vault_path
     )
+
+    tasknotes_dir = settings.tasknotes_path.relative_to(settings.vault_path).as_posix()
 
     prompt = f"""Сегодня {now.date()}. Сгенерируй месячный отчёт за {month_name}.
 
 КОНТЕКСТ:
 {context}
 
-ПЕРВЫМ ДЕЛОМ: вызови mcp__todoist__user-info чтобы убедиться что MCP работает.
+TASK STORE:
+- Активные и выполненные задачи лежат в {tasknotes_dir}
+- Для итогов используй task notes со status: done и completed за прошлый месяц
+- Не упоминай Todoist, MCP или ручное добавление
 
 WORKFLOW:
-1. Используй собранный контекст + Todoist completed tasks за прошлый месяц
+1. Используй собранный контекст + выполненные task notes за прошлый месяц
 2. Сводка ключевых достижений и уроков
 3. Задай 3-4 стратегических вопроса — конкретных, на основе паттернов из данных
    Хорошие вопросы: "Цель X стояла 3 недели — что помешало?"
@@ -156,14 +161,12 @@ CRITICAL OUTPUT FORMAT:
     if "error" in result:
         return
 
-    todoist = get_todoist()
-    if not todoist:
-        return
+    tasknotes = get_tasknotes()
 
     try:
-        tasks = await asyncio.to_thread(todoist.fetch_active_tasks)
+        tasks = await asyncio.to_thread(tasknotes.fetch_active_tasks)
     except Exception as e:
-        logger.warning("Failed to fetch tasks for monthly: %s", e)
+        logger.warning("Failed to fetch TaskNotes tasks for monthly: %s", e)
         return
 
     overdue = [

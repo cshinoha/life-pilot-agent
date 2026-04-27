@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from life_pilot.services.claude_runner import ClaudeRunner
     from life_pilot.services.git import VaultGit
     from life_pilot.services.processor import ClaudeProcessor
-    from life_pilot.services.todoist import TodoistService
+    from life_pilot.services.tasknotes import TaskNotesService
 
 
 @lru_cache(maxsize=1)
@@ -21,19 +21,19 @@ def get_processor() -> ClaudeProcessor:
     from life_pilot.services.processor import ClaudeProcessor
 
     return ClaudeProcessor(
-        settings.vault_path, settings.todoist_api_key, settings.coach_model,
+        settings.vault_path,
+        settings.coach_model,
+        settings.tasknotes_path,
     )
 
 
 @lru_cache(maxsize=1)
-def get_todoist() -> TodoistService | None:
-    """Return cached TodoistService or None if key is missing."""
+def get_tasknotes() -> TaskNotesService:
+    """Return cached TaskNotesService instance."""
     settings = get_settings()
-    if not settings.todoist_api_key:
-        return None
-    from life_pilot.services.todoist import TodoistService
+    from life_pilot.services.tasknotes import TaskNotesService
 
-    return TodoistService(settings.todoist_api_key)
+    return TaskNotesService(settings.vault_path, settings.tasknotes_path)
 
 
 @lru_cache(maxsize=1)
@@ -43,7 +43,10 @@ def get_runner() -> ClaudeRunner:
     from life_pilot.services.claude_runner import ClaudeRunner
 
     return ClaudeRunner(
-        settings.vault_path, settings.todoist_api_key, settings.claude_timeout,
+        settings.vault_path,
+        settings.claude_timeout,
+        settings.llm_cli,
+        settings.llm_model,
     )
 
 

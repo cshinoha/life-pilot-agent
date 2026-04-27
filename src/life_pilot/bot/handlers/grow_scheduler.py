@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from life_pilot.bot.formatters import format_process_report
 from life_pilot.config import get_settings
+from life_pilot.services.factory import get_processor
 from life_pilot.services.grow import (
     get_period_for_session,
     is_reflection_done,
@@ -21,6 +25,7 @@ from life_pilot.services.grow import (
 logger = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS = 3
+GrowState = dict[str, dict[str, str | int]]
 
 
 def _now_iso() -> str:
@@ -48,7 +53,7 @@ def _build_resume_keyboard(
 
 
 def _resolve_attempt(
-    state: dict,
+    state: GrowState,
     session_type: str,
     period: str,
 ) -> int:
@@ -58,17 +63,18 @@ def _resolve_attempt(
     calls). Returns _MAX_ATTEMPTS + 1 if the maximum has already been reached.
     """
     entry = state.get(session_type, {})
-    if entry.get("period") == period and isinstance(entry.get("attempt"), int):
-        return entry["attempt"] + 1
+    attempt = entry.get("attempt")
+    if entry.get("period") == period and isinstance(attempt, int):
+        return attempt + 1
     return 1
 
 
 def _save_attempt(
-    state: dict,
+    state: GrowState,
     session_type: str,
     period: str,
     attempt: int,
-    vault_path,
+    vault_path: Path,
 ) -> None:
     """Persist the updated attempt counter into .grow_state.json."""
     state[session_type] = {
@@ -493,3 +499,60 @@ async def scheduled_grow_yearly_start(bot: Bot, chat_id: int) -> None:
         logger.exception(
             "Failed to send yearly-start GROW start prompt (attempt %d)", attempt
         )
+
+
+async def scheduled_daily_plan(bot: Bot, chat_id: int) -> None:
+    """Send the daily plan generated from calendar and TaskNotes data."""
+    logger.info("Scheduled daily plan starting")
+    processor = get_processor()
+
+    try:
+        plan = await asyncio.to_thread(processor.get_daily_plan)
+    except Exception as e:
+        logger.error("Scheduled daily plan failed: %s", e)
+        try:
+            await bot.send_message(
+                chat_id,
+                f"⚠️ Не удалось сформировать план на день: {e}",
+            )
+        except Exception:
+            logger.exception("Failed to send daily plan error message")
+        return
+
+    try:
+        await bot.send_message(chat_id, plan)
+    except Exception:
+        try:
+            await bot.send_message(chat_id, plan, parse_mode=None)
+        except Exception:
+            logger.exception("Failed to send scheduled daily plan")
+
+
+async def scheduled_coach_compact(bot: Bot, chat_id: int) -> None:
+    """Compact the coaching profile and optionally report the result."""
+    logger.info("Scheduled coach compact starting")
+    processor = get_processor()
+
+    try:
+        result = await asyncio.to_thread(processor.compact_coach_profile)
+    except Exception as e:
+        logger.error("Scheduled coach compact failed: %s", e)
+        try:
+            await bot.send_message(chat_id, f"⚠️ Не удалось обновить коуч-профиль: {e}")
+        except Exception:
+            logger.exception("Failed to send coach compact error message")
+        return
+
+    report = result.get("report", "")
+    if not report and "error" not in result:
+        logger.info("Coach compact skipped — nothing to update")
+        return
+
+    formatted = format_process_report(result)
+    try:
+        await bot.send_message(chat_id, formatted)
+    except Exception:
+        try:
+            await bot.send_message(chat_id, formatted, parse_mode=None)
+        except Exception:
+            logger.exception("Failed to send coach compact report")

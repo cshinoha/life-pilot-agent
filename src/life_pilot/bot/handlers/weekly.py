@@ -18,7 +18,7 @@ from life_pilot.bot.progress import BusyError, run_with_progress
 from life_pilot.bot.states import WeeklyGoalsStates
 from life_pilot.bot.utils import send_formatted_report
 from life_pilot.config import get_settings
-from life_pilot.services.factory import get_git, get_processor, get_todoist
+from life_pilot.services.factory import get_git, get_processor, get_tasknotes
 
 router = Router(name="weekly")
 logger = logging.getLogger(__name__)
@@ -84,46 +84,45 @@ async def cmd_weekly(message: Message) -> None:
 
     # ── Send per-task keyboards (ТЗ 1.1) ──────────────────────────────
     if "error" not in report:
-        todoist = get_todoist()
-        if todoist:
-            try:
-                tasks = await asyncio.to_thread(todoist.fetch_active_tasks)
-            except Exception as e:
-                logger.warning("Failed to fetch Todoist tasks for weekly: %s", e)
-                tasks = []
+        tasknotes = get_tasknotes()
+        try:
+            tasks = await asyncio.to_thread(tasknotes.fetch_active_tasks)
+        except Exception as e:
+            logger.warning("Failed to fetch TaskNotes tasks for weekly: %s", e)
+            tasks = []
 
-            if tasks:
-                # Filter: tasks due within the next 7 days or overdue
-                today = date.today()
-                cutoff = (today + timedelta(days=7)).isoformat()
-                today_str = today.isoformat()
+        if tasks:
+            # Filter: tasks due within the next 7 days or overdue
+            today = date.today()
+            cutoff = (today + timedelta(days=7)).isoformat()
+            today_str = today.isoformat()
 
-                relevant = [
-                    t for t in tasks
-                    if t.get("due") and t["due"].get("date", "") <= cutoff
-                ]
+            relevant = [
+                t for t in tasks
+                if t.get("due") and t["due"].get("date", "") <= cutoff
+            ]
 
-                if relevant:
+            if relevant:
+                await message.answer(
+                    f"📋 <b>Задачи к обзору ({len(relevant)}):</b>\n"
+                    "Выбери действие для каждой задачи:"
+                )
+
+                for task in relevant:
+                    task_id = str(task.get("id", ""))
+                    content = task.get("content", "Без названия")
+                    due_date = task.get("due", {}).get("date", "")
+                    overdue = due_date < today_str if due_date else False
+
+                    prefix = "⚠️ " if overdue else "📌 "
+                    text = f"{prefix}{content}"
+                    if due_date:
+                        text += f"\n<i>Срок: {due_date}</i>"
+
                     await message.answer(
-                        f"📋 <b>Задачи к обзору ({len(relevant)}):</b>\n"
-                        "Выбери действие для каждой задачи:"
+                        text,
+                        reply_markup=create_task_keyboard(task_id, "weekly"),
                     )
-
-                    for task in relevant:
-                        task_id = str(task.get("id", ""))
-                        content = task.get("content", "Без названия")
-                        due_date = task.get("due", {}).get("date", "")
-                        overdue = due_date < today_str if due_date else False
-
-                        prefix = "⚠️ " if overdue else "📌 "
-                        text = f"{prefix}{content}"
-                        if due_date:
-                            text += f"\n<i>Срок: {due_date}</i>"
-
-                        await message.answer(
-                            text,
-                            reply_markup=create_task_keyboard(task_id, "weekly"),
-                        )
 
     # ── Weekly goals staleness check ──────────────────────────────────
     if message.bot:
@@ -152,7 +151,10 @@ async def scheduled_weekly_report(bot: Bot, chat_id: int) -> None:
     except Exception as e:
         logger.error("Scheduled weekly report failed: %s", e)
         try:
-            await bot.send_message(chat_id, f"⚠️ Не удалось сгенерировать недельный дайджест: {e}")
+            await bot.send_message(
+                chat_id,
+                f"⚠️ Не удалось сгенерировать недельный дайджест: {e}",
+            )
         except Exception:
             pass
         return
@@ -191,7 +193,8 @@ async def handle_update_weekly_goals_prompt(
     await state.set_state(WeeklyGoalsStates.waiting_goals)
     await msg.answer(
         "Напиши свои цели на эту неделю (или отправь голосовое).\n\n"
-        "Когда закончишь — отправь сообщение, и я сохраню его в <code>goals/3-weekly.md</code>."
+        "Когда закончишь — отправь сообщение, и я сохраню его в "
+        "<code>goals/3-weekly.md</code>."
     )
 
 
@@ -217,7 +220,9 @@ async def handle_weekly_goals_input(message: Message, state: FSMContext) -> None
     try:
         await asyncio.to_thread(goals_path.write_text, content, "utf-8")
         await state.clear()
-        await message.answer("✅ Цели на неделю сохранены в <code>goals/3-weekly.md</code>.")
+        await message.answer(
+            "✅ Цели на неделю сохранены в <code>goals/3-weekly.md</code>."
+        )
         logger.info("Weekly goals updated by user on %s", today.isoformat())
     except Exception:
         logger.exception("Failed to save weekly goals")

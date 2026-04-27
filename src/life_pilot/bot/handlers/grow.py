@@ -11,6 +11,7 @@ import asyncio
 import logging
 import re
 from html import escape as html_escape
+from typing import Any, cast
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -42,6 +43,14 @@ from life_pilot.services.grow import (
 
 router = Router(name="grow")
 logger = logging.getLogger(__name__)
+
+Question = dict[str, str]
+Questions = list[Question]
+AnswerValue = str | list[str]
+Answers = dict[str, AnswerValue]
+ProcessGoal = dict[str, str]
+ProcessGoals = list[ProcessGoal]
+GoalUpdates = dict[str, Any]
 
 # ---------------------------------------------------------------------------
 # Type abbreviations for callback_data (64-byte limit)
@@ -105,7 +114,7 @@ def _resume_keyboard(session_type: str) -> InlineKeyboardMarkup:
 async def _send_question(
     bot: Bot,
     chat_id: int,
-    question: dict,
+    question: Question,
     session_type: str,
     index: int,
     total: int,
@@ -210,8 +219,8 @@ async def _finalize_session(bot: Bot, chat_id: int, state: FSMContext) -> None:
     data = await state.get_data()
     session_type: str = data["session_type"]
     period: str = data["period"]
-    questions: list[dict] = data["questions"]
-    answers: dict = data["answers"]
+    questions = cast(Questions, data["questions"])
+    answers = cast(Answers, data["answers"])
     settings = get_settings()
     vault_path = settings.vault_path
 
@@ -238,11 +247,11 @@ async def _finalize_session(bot: Bot, chat_id: int, state: FSMContext) -> None:
 
     summary: str = result.get("summary", "")
     goal_updates = result.get("goal_updates")
-    process_goals: list[dict] = result.get("process_goals") or []
+    process_goals = cast(ProcessGoals, result.get("process_goals") or [])
 
     # Store in FSM for confirm/correct flow
     data["summary"] = summary
-    data["goal_updates"] = goal_updates
+    data["goal_updates"] = cast(GoalUpdates | None, goal_updates)
     data["process_goals"] = process_goals
     await state.set_data(data)
     await state.set_state(GrowStates.confirming)
@@ -360,10 +369,10 @@ async def handle_question_action(
         return
 
     data = await state.get_data()
-    questions: list[dict] = data.get("questions", [])
-    answers: dict = data.get("answers", {})
+    questions = cast(Questions, data.get("questions", []))
+    answers = cast(Answers, data.get("answers", {}))
     current_messages: list[str] = data.get("current_messages", [])
-    deferred_questions: list[dict] = data.get("deferred_questions", [])
+    deferred_questions = cast(Questions, data.get("deferred_questions", []))
     deferred_count: dict[str, int] = data.get("deferred_count", {})
 
     settings = get_settings()
@@ -469,10 +478,10 @@ async def handle_confirm(callback: CallbackQuery, bot: Bot, state: FSMContext) -
     session_type: str = data["session_type"]
     period: str = data["period"]
     summary: str = data.get("summary", "")
-    questions: list[dict] = data.get("questions", [])
-    answers: dict = data.get("answers", {})
+    questions = cast(Questions, data.get("questions", []))
+    answers = cast(Answers, data.get("answers", {}))
     goal_updates = data.get("goal_updates")
-    process_goals: list[dict] = data.get("process_goals") or []
+    process_goals = cast(ProcessGoals, data.get("process_goals") or [])
 
     settings = get_settings()
     vault_path = settings.vault_path
@@ -628,8 +637,8 @@ async def handle_grow_correcting(message: Message, bot: Bot, state: FSMContext) 
 
     data = await state.get_data()
     session_type: str = data["session_type"]
-    questions: list[dict] = data.get("questions", [])
-    answers: dict = data.get("answers", {})
+    questions = cast(Questions, data.get("questions", []))
+    answers = cast(Answers, data.get("answers", {}))
 
     status_msg = await message.answer("\u23f3 Пересобираю анализ...")
     result = await analyze_answers(
@@ -638,7 +647,7 @@ async def handle_grow_correcting(message: Message, bot: Bot, state: FSMContext) 
 
     summary: str = result.get("summary", "")
     goal_updates = result.get("goal_updates")
-    process_goals: list[dict] = result.get("process_goals") or []
+    process_goals = cast(ProcessGoals, result.get("process_goals") or [])
 
     data["summary"] = summary
     data["goal_updates"] = goal_updates

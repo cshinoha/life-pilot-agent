@@ -7,7 +7,7 @@ tier: active
 ---
 # Phase 2: EXECUTE
 
-Read capture.json from Phase 1. Create Todoist tasks, save thoughts, update CRM.
+Read capture.json from Phase 1. Create TaskNotes task files, save thoughts, update CRM.
 
 ## Input
 - `.session/capture.json` — output from Phase 1
@@ -16,21 +16,25 @@ Read capture.json from Phase 1. Create Todoist tasks, save thoughts, update CRM.
 
 ## Task
 
-### 1. Create Todoist tasks
+### 1. Create TaskNotes task files
 
 For each entry with `classification: "task"`:
 
-```bash
-mcp-cli call todoist add-tasks '{"tasks": [{"content": "...", "dueString": "...", "priority": N}]}'
+Create markdown files in `TaskNotes/Tasks/` with frontmatter:
+
+```yaml
+title: ...
+status: open
+due: YYYY-MM-DD
+priority: p1|p2|p3|p4
+created: YYYY-MM-DDTHH:MM:SS
 ```
 
-Record created task IDs.
+Record created task paths/IDs.
 
 ### 2. Check process goals
 
-```bash
-mcp-cli call todoist find-tasks '{"labels": ["process-goal"]}'
-```
+Read existing task notes with `contexts: [process-goal]`.
 
 If missing or stale → create from goals.
 
@@ -61,21 +65,17 @@ For all created/updated files:
 
 ### 6. Check workload
 
-```bash
-mcp-cli call todoist find-tasks-by-date '{"startDate": "today", "daysCount": 7}'
-```
+Read active task notes due in the next 7 days.
 
-## mcp-cli retry algorithm
+## File write retry algorithm
 
 ```
-1. Call mcp-cli
-2. Error? Wait 10 sec, read vault files
-3. Call again
-4. Error? Wait 20 sec
-5. Call third time — GUARANTEED to work
+1. Write the markdown file
+2. Error? Re-read directory and retry once
+3. If it still fails — report the exact file error
 ```
 
-NEVER say "MCP unavailable". Always retry 3x.
+NEVER say "MCP unavailable" or mention Todoist.
 
 ## Output Format
 
@@ -84,7 +84,7 @@ Print ONLY valid JSON:
 ```json
 {
   "tasks_created": [
-    {"id": "8501234567", "content": "Follow-up Acme Corp", "priority": 2, "due": "tomorrow"}
+    {"id": "tn-123abc456def", "path": "TaskNotes/Tasks/2026-02-19-follow-up-acme.md", "content": "Follow-up Acme Corp", "priority": "p2", "due": "2026-02-20"}
   ],
   "thoughts_saved": [
     {"path": "thoughts/ideas/2026-02-19-layered-memory.md", "title": "AI agents need layered memory", "category": "ideas"}
